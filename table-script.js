@@ -5,7 +5,7 @@ let isDarkMode = false;
 let mapInfos = {}; // 地圖資訊
 let nextMapId = 3; // 下一個地圖ID
 let editingMapId = null; // 正在編輯的地圖ID
-let currentSortMode = 'default'; // 當前排序模式: 'default', 'mapLevel', 'respawnTime'
+let currentSortMode = 'mapLevel'; // 當前排序模式: 'mapLevel', 'respawnTime', 'chapterKing'
 
 // 初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadData();
     updateRowNumbers();
     updateMapSelects();
+    // 確保初始排序模式正確應用
+    sortTable(currentSortMode);
 });
 
 // 初始化預設地圖
@@ -503,20 +505,20 @@ function toggleSort() {
     
     // 切換排序模式
     switch (currentSortMode) {
-        case 'default':
-            currentSortMode = 'mapLevel';
-            sortBtn.textContent = '按地圖等級排序';
-            sortTable('mapLevel');
-            break;
         case 'mapLevel':
             currentSortMode = 'respawnTime';
-            sortBtn.textContent = '按重生時間排序';
+            sortBtn.textContent = '切換排序 (目前為重生時間)';
             sortTable('respawnTime');
             break;
         case 'respawnTime':
-            currentSortMode = 'default';
-            sortBtn.textContent = '排序切換';
-            sortTable('default');
+            currentSortMode = 'chapterKing';
+            sortBtn.textContent = '切換排序 (目前為章節王重生時間)';
+            sortTable('chapterKing');
+            break;
+        case 'chapterKing':
+            currentSortMode = 'mapLevel';
+            sortBtn.textContent = '切換排序 (目前為地圖等級)';
+            sortTable('mapLevel');
             break;
     }
     
@@ -529,13 +531,16 @@ function updateSortButtonText() {
     if (sortBtn) {
         switch (currentSortMode) {
             case 'mapLevel':
-                sortBtn.textContent = '按地圖等級排序';
+                sortBtn.textContent = '切換排序 (目前為地圖等級)';
                 break;
             case 'respawnTime':
-                sortBtn.textContent = '按重生時間排序';
+                sortBtn.textContent = '切換排序 (目前為重生時間)';
+                break;
+            case 'chapterKing':
+                sortBtn.textContent = '切換排序 (目前為章節王重生時間)';
                 break;
             default:
-                sortBtn.textContent = '排序切換';
+                sortBtn.textContent = '切換排序 (目前為地圖等級)';
                 break;
         }
     }
@@ -546,29 +551,24 @@ function sortTable(mode) {
     const tableBody = document.getElementById('tableBody');
     const rows = Array.from(tableBody.querySelectorAll('.data-row'));
     
-    rows.sort((a, b) => {
-        if (mode === 'mapLevel') {
-            // 按地圖等級和地圖分流排序（數字小的在上方）
-            const aMapId = a.querySelector('.map-select').value;
-            const bMapId = b.querySelector('.map-select').value;
-            const aMapBranch = parseInt(a.querySelector('.map-branch input').value);
-            const bMapBranch = parseInt(b.querySelector('.map-branch input').value);
+    if (mode === 'chapterKing') {
+        // 章節王排序：只顯示章節王，按重生時間排序
+        rows.forEach(row => {
+            const mapId = row.querySelector('.map-select').value;
+            const map = mapInfos[mapId];
             
-            const aMap = mapInfos[aMapId];
-            const bMap = mapInfos[bMapId];
-            
-            if (!aMap || !bMap) return 0;
-            
-            // 先按地圖等級排序
-            if (aMap.level !== bMap.level) {
-                return aMap.level - bMap.level;
+            if (map && map.chapterKing === 'T') {
+                // 章節王：顯示並繼續倒數
+                row.style.display = '';
+            } else {
+                // 非章節王：隱藏但繼續倒數
+                row.style.display = 'none';
             }
-            
-            // 地圖等級相同時按地圖分流排序
-            return aMapBranch - bMapBranch;
-            
-        } else if (mode === 'respawnTime') {
-            // 按重生時間排序（超時越久越上方）
+        });
+        
+        // 對可見的章節王行進行排序
+        const visibleRows = rows.filter(row => row.style.display !== 'none');
+        visibleRows.sort((a, b) => {
             const aTimeText = a.querySelector('.time-text');
             const bTimeText = b.querySelector('.time-text');
             
@@ -576,17 +576,54 @@ function sortTable(mode) {
             const bWeight = getRespawnTimeWeight(bTimeText);
             
             return aWeight - bWeight;
-            
-        } else {
-            // 預設排序（按ID排序）
-            const aId = parseInt(a.getAttribute('data-id'));
-            const bId = parseInt(b.getAttribute('data-id'));
-            return aId - bId;
-        }
-    });
+        });
+        
+        // 重新排列可見行
+        visibleRows.forEach(row => tableBody.appendChild(row));
+        
+    } else {
+        // 其他排序模式：顯示所有行
+        rows.forEach(row => {
+            row.style.display = '';
+        });
+        
+        rows.sort((a, b) => {
+            if (mode === 'mapLevel') {
+                // 按地圖等級和地圖分流排序（數字小的在上方）
+                const aMapId = a.querySelector('.map-select').value;
+                const bMapId = b.querySelector('.map-select').value;
+                const aMapBranch = parseInt(a.querySelector('.map-branch input').value);
+                const bMapBranch = parseInt(b.querySelector('.map-branch input').value);
+                
+                const aMap = mapInfos[aMapId];
+                const bMap = mapInfos[bMapId];
+                
+                if (!aMap || !bMap) return 0;
+                
+                // 先按地圖等級排序
+                if (aMap.level !== bMap.level) {
+                    return aMap.level - bMap.level;
+                }
+                
+                // 地圖等級相同時按地圖分流排序
+                return aMapBranch - bMapBranch;
+                
+            } else if (mode === 'respawnTime') {
+                // 按重生時間排序（超時越久越上方）
+                const aTimeText = a.querySelector('.time-text');
+                const bTimeText = b.querySelector('.time-text');
+                
+                const aWeight = getRespawnTimeWeight(aTimeText);
+                const bWeight = getRespawnTimeWeight(bTimeText);
+                
+                return aWeight - bWeight;
+            }
+        });
+        
+        // 重新排列行
+        rows.forEach(row => tableBody.appendChild(row));
+    }
     
-    // 重新排列行
-    rows.forEach(row => tableBody.appendChild(row));
     updateRowNumbers();
 }
 
@@ -718,7 +755,7 @@ function loadData() {
             nextId = data.nextId || nextId;
             nextMapId = data.nextMapId || nextMapId;
             isDarkMode = data.darkMode || false;
-            currentSortMode = data.sortMode || 'default';
+            currentSortMode = data.sortMode || 'mapLevel';
             
             // 載入地圖資訊
             if (data.mapInfos) {
@@ -792,9 +829,7 @@ function loadData() {
                 updateRowNumbers();
                 
                 // 應用保存的排序
-                if (currentSortMode !== 'default') {
-                    sortTable(currentSortMode);
-                }
+                sortTable(currentSortMode);
             }
         } catch (error) {
             console.error('載入數據失敗:', error);
@@ -917,9 +952,7 @@ function importData(event) {
                     updateMapSelects();
                     
                     // 應用當前排序
-                    if (currentSortMode !== 'default') {
-                        sortTable(currentSortMode);
-                    }
+                    sortTable(currentSortMode);
                     
                     autoSave();
                     
