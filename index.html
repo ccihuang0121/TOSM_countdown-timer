@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倒計時</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 標題區域 -->
+        <header class="header">
+            <h1 class="title">倒計時(★收藏+提醒音+保存+暗黑模式)</h1>
+            <p class="description">章節永遠顯示;分流可新增;收藏;提醒音;自動保存;暗黑主題。(章節數:5)</p>
+        </header>
+
+        <!-- 控制按鈕區域 -->
+        <div class="controls">
+            <button class="control-btn" id="resetData">重置資料</button>
+            <button class="control-btn" id="enableSound">啟用提醒音</button>
+            <button class="control-btn" id="darkMode">🌙 暗黑模式</button>
+            
+            <div class="volume-control">
+                <label for="volume">音量</label>
+                <input type="range" id="volume" min="0" max="100" value="70">
+                <input type="checkbox" id="mute">
+                <label for="mute">靜音</label>
+            </div>
+        </div>
+
+        <!-- 宣傳橫幅 -->
+        <div class="banner">
+            <span>📺 作者直播平台 YouTube 頻道 👍 支持作者繼續更新,歡迎訂閱直播!! ❤️</span>
+        </div>
+
+        <!-- 主要內容區域 -->
+        <main class="main-content">
+            <div class="chapter-header">
+                <h2>第七章</h2>
+            </div>
+
+            <div class="cards-grid">
+                <!-- 扎卡里耶爾交叉路卡片 -->
+                <div class="card expanded">
+                    <div class="card-header">
+                        <h3>扎卡里耶爾交叉路</h3>
+                        <button class="add-branch-btn">新增分流</button>
+                    </div>
+                    <div class="card-content">
+                        <div class="branch-card">
+                            <div class="branch-header">
+                                <span>分流1</span>
+                                <button class="favorite-btn">☆</button>
+                            </div>
+                            <div class="timer-controls">
+                                <div class="reminder-setting">
+                                    <label>提前提醒(分)</label>
+                                    <input type="number" value="5" min="0">
+                                </div>
+                                <div class="time-inputs">
+                                    <input type="number" value="0" min="0" placeholder="時">
+                                    <input type="number" value="0" min="0" placeholder="分">
+                                    <input type="number" value="0" min="0" placeholder="秒">
+                                </div>
+                                <div class="timer-buttons">
+                                    <button class="timer-btn start">開始</button>
+                                    <button class="timer-btn pause">暫停</button>
+                                    <button class="timer-btn reset">重設</button>
+                                    <button class="timer-btn delete">刪除</button>
+                                </div>
+                                <div class="timer-status">尚未設定</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 王陵一層卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>王陵一層</h3>
+                        <button class="add-branch-btn">新增分流</button>
+                    </div>
+                </div>
+
+                <!-- 王陵二層卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>王陵二層</h3>
+                        <button class="add-branch-btn">新增分流</button>
+                    </div>
+                </div>
+
+                <!-- 王陵三層卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>王陵三層</h3>
+                        <button class="add-branch-btn">新增分流</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+
+
+

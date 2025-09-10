@@ -1,0 +1,887 @@
+// 全局變數
+let timers = {};
+let nextId = 5; // 下一個ID
+let isDarkMode = false;
+let mapInfos = {}; // 地圖資訊
+let nextMapId = 3; // 下一個地圖ID
+let editingMapId = null; // 正在編輯的地圖ID
+let currentSortMode = 'default'; // 當前排序模式: 'default', 'mapLevel', 'respawnTime'
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDefaultMaps();
+    initializeEventListeners();
+    loadData();
+    updateRowNumbers();
+    updateMapSelects();
+});
+
+// 初始化預設地圖
+function initializeDefaultMaps() {
+    mapInfos = {
+        1: {
+            id: 1,
+            name: '王陵3層',
+            level: 68,
+            boss: '雷克西波',
+            chapterKing: 'T'
+        },
+        2: {
+            id: 2,
+            name: '魔族收監所第5區',
+            level: 74,
+            boss: '哈勃克',
+            chapterKing: 'T'
+        }
+    };
+}
+
+// 事件監聽器初始化
+function initializeEventListeners() {
+    // 控制按鈕事件
+    document.getElementById('addRecord').addEventListener('click', addNewRecord);
+    document.getElementById('manageMaps').addEventListener('click', openMapModal);
+    document.getElementById('sortToggle').addEventListener('click', toggleSort);
+    document.getElementById('resetAll').addEventListener('click', resetAllTimers);
+    document.getElementById('exportData').addEventListener('click', exportData);
+    document.getElementById('importData').addEventListener('click', () => {
+        document.getElementById('fileInput').click();
+    });
+    
+    // 模態框事件
+    document.getElementById('closeMapModal').addEventListener('click', closeMapModal);
+    document.getElementById('saveMap').addEventListener('click', saveMap);
+    document.getElementById('cancelMap').addEventListener('click', cancelMapEdit);
+    
+    // 文件輸入事件
+    document.getElementById('fileInput').addEventListener('change', importData);
+    
+    // 自動保存事件
+    document.addEventListener('input', autoSave);
+    
+    // 鍵盤快捷鍵
+    document.addEventListener('keydown', handleKeyboardShortcuts);
+    
+    // 點擊模態框外部關閉
+    document.getElementById('mapModal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeMapModal();
+        }
+    });
+}
+
+// 時間輸入格式化
+function formatTimeInput(input) {
+    // 只允許數字輸入
+    input.value = input.value.replace(/[^0-9]/g, '');
+    
+    // 限制最大長度為4位
+    if (input.value.length > 4) {
+        input.value = input.value.slice(0, 4);
+    }
+}
+
+// 解析時間輸入
+function parseTimeInput(timeStr) {
+    if (!timeStr || timeStr.length === 0) {
+        return { hours: 0, minutes: 0 };
+    }
+    
+    const num = parseInt(timeStr);
+    
+    if (timeStr.length === 1) {
+        // 1位數：代表分鐘
+        return { hours: 0, minutes: num };
+    } else if (timeStr.length === 2) {
+        // 2位數：代表分鐘
+        return { hours: 0, minutes: num };
+    } else if (timeStr.length === 3) {
+        // 3位數：前1位小時，後2位分鐘
+        const hours = Math.floor(num / 100);
+        const minutes = num % 100;
+        return { hours, minutes };
+    } else if (timeStr.length === 4) {
+        // 4位數：前2位小時，後2位分鐘
+        const hours = Math.floor(num / 100);
+        const minutes = num % 100;
+        return { hours, minutes };
+    }
+    
+    return { hours: 0, minutes: 0 };
+}
+
+// 計時器功能
+function startTimer(id) {
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    const timeInput = row.querySelector('.time-input');
+    const timeText = row.querySelector('.time-text');
+    const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+    const startBtn = row.querySelector('.timer-btn.start');
+    const resetBtn = row.querySelector('.timer-btn.reset');
+    
+    // 解析時間輸入
+    const { hours, minutes } = parseTimeInput(timeInput.value);
+    
+    if (hours === 0 && minutes === 0) {
+        alert('請輸入復活時間（例如：1234 代表 12小時34分鐘）');
+        return;
+    }
+    
+    // 停止現有計時器
+    if (timers[id]) {
+        clearInterval(timers[id]);
+    }
+    
+    // 計算總分鐘數
+    const totalMinutes = hours * 60 + minutes;
+    
+    // 計算重生時間
+    const now = new Date();
+    const respawnTime = new Date(now.getTime() + totalMinutes * 60 * 1000);
+    
+    // 顯示復活時間（只顯示時間，不顯示日期）
+    const respawnTimeStr = respawnTime.toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    respawnTimeDisplay.textContent = `復活: ${respawnTimeStr}`;
+    
+    // 更新按鈕狀態
+    startBtn.disabled = true;
+    resetBtn.disabled = false;
+    
+    // 開始倒數計時
+    timers[id] = setInterval(() => {
+        const now = new Date();
+        const remaining = respawnTime - now;
+        
+        if (remaining <= 0) {
+            // 計算超時時間
+            const overdue = Math.abs(remaining);
+            const overdueHours = Math.floor(overdue / (1000 * 60 * 60));
+            const overdueMinutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
+            const overdueSeconds = Math.floor((overdue % (1000 * 60)) / 1000);
+            
+            // 顯示超時時間
+            timeText.textContent = `超時 +${overdueHours.toString().padStart(2, '0')}:${overdueMinutes.toString().padStart(2, '0')}:${overdueSeconds.toString().padStart(2, '0')}`;
+            timeText.className = 'time-text timer-overdue';
+            
+            // 保持復活時間顯示（現在在獨立欄位中）
+            respawnTimeDisplay.textContent = `復活: ${respawnTimeStr}`;
+        } else {
+            // 更新顯示時間
+            const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+            const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+            const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+            
+            timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            timeText.className = 'time-text timer-running';
+        }
+    }, 1000);
+    
+    // 立即更新一次顯示
+    const remaining = respawnTime - new Date();
+    if (remaining > 0) {
+        const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+        const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        timeText.className = 'time-text timer-running';
+    }
+    
+    // 顯示復活時間
+    respawnTimeDisplay.textContent = `復活: ${respawnTimeStr}`;
+}
+
+// 暫停功能已移除
+
+function resetTimer(id) {
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    const timeText = row.querySelector('.time-text');
+    const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+    const startBtn = row.querySelector('.timer-btn.start');
+    const resetBtn = row.querySelector('.timer-btn.reset');
+    const timeInput = row.querySelector('.time-input');
+    
+    // 停止計時器
+    if (timers[id]) {
+        clearInterval(timers[id]);
+        delete timers[id];
+    }
+    
+    // 重置顯示
+    timeText.textContent = '尚未設定';
+    timeText.className = 'time-text';
+    respawnTimeDisplay.textContent = '';
+    
+    // 清空時間輸入框
+    timeInput.value = '';
+    
+    // 重置按鈕狀態
+    startBtn.disabled = false;
+    resetBtn.disabled = true;
+}
+
+// 地圖管理功能
+function openMapModal() {
+    document.getElementById('mapModal').style.display = 'block';
+    refreshMapList();
+    clearMapForm();
+}
+
+function closeMapModal() {
+    document.getElementById('mapModal').style.display = 'none';
+    editingMapId = null;
+    clearMapForm();
+}
+
+function clearMapForm() {
+    document.getElementById('mapNameInput').value = '';
+    document.getElementById('mapLevelInput').value = '';
+    document.getElementById('bossNameInput').value = '';
+    document.getElementById('chapterKingInput').value = 'T';
+    document.getElementById('saveMap').textContent = '儲存地圖';
+}
+
+function saveMap() {
+    const name = document.getElementById('mapNameInput').value.trim();
+    const level = parseInt(document.getElementById('mapLevelInput').value);
+    const boss = document.getElementById('bossNameInput').value.trim();
+    const chapterKing = document.getElementById('chapterKingInput').value;
+    
+    if (!name || !level || !boss) {
+        alert('請填寫所有必要欄位');
+        return;
+    }
+    
+    if (editingMapId) {
+        // 編輯現有地圖
+        mapInfos[editingMapId] = {
+            id: editingMapId,
+            name: name,
+            level: level,
+            boss: boss,
+            chapterKing: chapterKing
+        };
+    } else {
+        // 新增地圖
+        mapInfos[nextMapId] = {
+            id: nextMapId,
+            name: name,
+            level: level,
+            boss: boss,
+            chapterKing: chapterKing
+        };
+        nextMapId++;
+    }
+    
+    refreshMapList();
+    updateMapSelects();
+    clearMapForm();
+    autoSave();
+}
+
+function cancelMapEdit() {
+    clearMapForm();
+    editingMapId = null;
+}
+
+function editMap(mapId) {
+    const map = mapInfos[mapId];
+    if (map) {
+        document.getElementById('mapNameInput').value = map.name;
+        document.getElementById('mapLevelInput').value = map.level;
+        document.getElementById('bossNameInput').value = map.boss;
+        document.getElementById('chapterKingInput').value = map.chapterKing;
+        document.getElementById('saveMap').textContent = '更新地圖';
+        editingMapId = mapId;
+    }
+}
+
+function deleteMap(mapId) {
+    if (confirm('確定要刪除此地圖嗎？這會影響所有使用此地圖的計時器記錄。')) {
+        delete mapInfos[mapId];
+        refreshMapList();
+        updateMapSelects();
+        autoSave();
+    }
+}
+
+function refreshMapList() {
+    const container = document.getElementById('mapListContainer');
+    container.innerHTML = '';
+    
+    // 按照地圖等級排序
+    const sortedMaps = Object.values(mapInfos).sort((a, b) => {
+        return a.level - b.level; // 升序排列（等級由低到高）
+    });
+    
+    sortedMaps.forEach(map => {
+        const mapItem = document.createElement('div');
+        mapItem.className = 'map-item';
+        mapItem.innerHTML = `
+            <div class="map-item-info">
+                <div class="map-item-name">${map.name}</div>
+                <div class="map-item-details">等級 ${map.level} | BOSS: ${map.boss} | 章節王: ${map.chapterKing}</div>
+            </div>
+            <div class="map-item-actions">
+                <button class="map-item-btn edit" onclick="editMap(${map.id})">編輯</button>
+                <button class="map-item-btn delete" onclick="deleteMap(${map.id})">刪除</button>
+            </div>
+        `;
+        container.appendChild(mapItem);
+    });
+}
+
+function updateMapSelects() {
+    const selects = document.querySelectorAll('.map-select');
+    selects.forEach(select => {
+        const currentValue = select.value;
+        select.innerHTML = '';
+        
+        // 按照地圖等級排序
+        const sortedMaps = Object.values(mapInfos).sort((a, b) => {
+            return a.level - b.level; // 升序排列（等級由低到高）
+        });
+        
+        sortedMaps.forEach(map => {
+            const option = document.createElement('option');
+            option.value = map.id;
+            option.textContent = `${map.name} (Lv.${map.level}) - ${map.boss} [${map.chapterKing}]`;
+            select.appendChild(option);
+        });
+        
+        // 恢復之前選擇的值
+        if (currentValue && mapInfos[currentValue]) {
+            select.value = currentValue;
+        }
+    });
+}
+
+function updateMapInfo(recordId, mapId) {
+    // 這個函數會在選擇地圖時被調用
+    autoSave();
+}
+
+// 數據管理功能
+function addNewRecord() {
+    const tableBody = document.getElementById('tableBody');
+    const newRow = document.createElement('tr');
+    newRow.className = 'data-row';
+    newRow.setAttribute('data-id', nextId);
+    
+    // 獲取第一個可用的地圖ID
+    const firstMapId = Object.keys(mapInfos)[0] || 1;
+    
+    // 按照地圖等級排序生成選項
+    const sortedMaps = Object.values(mapInfos).sort((a, b) => a.level - b.level);
+    
+    newRow.innerHTML = `
+        <td class="row-number">${nextId}</td>
+        <td class="map-info">
+            <select class="map-select" onchange="updateMapInfo(${nextId}, this.value)">
+                ${sortedMaps.map(map => 
+                    `<option value="${map.id}">${map.name} (Lv.${map.level}) - ${map.boss} [${map.chapterKing}]</option>`
+                ).join('')}
+            </select>
+        </td>
+        <td class="map-branch">
+            <input type="number" value="1" class="editable-input">
+        </td>
+        <td class="respawn-duration">
+            <div class="duration-controls">
+                <div class="time-input-section">
+                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                    <span class="time-hint">時分</span>
+                </div>
+                <div class="timer-controls">
+                    <button class="timer-btn start" onclick="startTimer(${nextId})">開始</button>
+                    <button class="timer-btn reset" onclick="resetTimer(${nextId})" disabled>重設</button>
+                </div>
+            </div>
+        </td>
+        <td class="respawn-status">
+            <div class="status-display">
+                <span class="time-text">尚未設定</span>
+            </div>
+        </td>
+        <td class="respawn-time">
+            <div class="time-display">
+                <span class="respawn-time-display"></span>
+            </div>
+        </td>
+        <td class="actions">
+            <button class="action-btn delete" onclick="deleteRecord(${nextId})">刪除</button>
+        </td>
+    `;
+    
+    tableBody.appendChild(newRow);
+    nextId++;
+    updateRowNumbers();
+    autoSave();
+}
+
+function deleteRecord(id) {
+    if (confirm('確定要刪除此記錄嗎？')) {
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (row) {
+            // 停止計時器
+            if (timers[id]) {
+                clearInterval(timers[id]);
+                delete timers[id];
+            }
+            
+            row.remove();
+            updateRowNumbers();
+            autoSave();
+        }
+    }
+}
+
+
+function resetAllTimers() {
+    if (confirm('確定要重置所有計時器嗎？')) {
+        Object.keys(timers).forEach(id => {
+            resetTimer(parseInt(id));
+        });
+    }
+}
+
+// 排序切換功能
+function toggleSort() {
+    const sortBtn = document.getElementById('sortToggle');
+    
+    // 切換排序模式
+    switch (currentSortMode) {
+        case 'default':
+            currentSortMode = 'mapLevel';
+            sortBtn.textContent = '按地圖等級排序';
+            sortTable('mapLevel');
+            break;
+        case 'mapLevel':
+            currentSortMode = 'respawnTime';
+            sortBtn.textContent = '按重生時間排序';
+            sortTable('respawnTime');
+            break;
+        case 'respawnTime':
+            currentSortMode = 'default';
+            sortBtn.textContent = '排序切換';
+            sortTable('default');
+            break;
+    }
+    
+    autoSave(); // 保存排序狀態
+}
+
+// 更新排序按鈕文字
+function updateSortButtonText() {
+    const sortBtn = document.getElementById('sortToggle');
+    if (sortBtn) {
+        switch (currentSortMode) {
+            case 'mapLevel':
+                sortBtn.textContent = '按地圖等級排序';
+                break;
+            case 'respawnTime':
+                sortBtn.textContent = '按重生時間排序';
+                break;
+            default:
+                sortBtn.textContent = '排序切換';
+                break;
+        }
+    }
+}
+
+// 排序表格
+function sortTable(mode) {
+    const tableBody = document.getElementById('tableBody');
+    const rows = Array.from(tableBody.querySelectorAll('.data-row'));
+    
+    rows.sort((a, b) => {
+        if (mode === 'mapLevel') {
+            // 按地圖等級和地圖分流排序（數字小的在上方）
+            const aMapId = a.querySelector('.map-select').value;
+            const bMapId = b.querySelector('.map-select').value;
+            const aMapBranch = parseInt(a.querySelector('.map-branch input').value);
+            const bMapBranch = parseInt(b.querySelector('.map-branch input').value);
+            
+            const aMap = mapInfos[aMapId];
+            const bMap = mapInfos[bMapId];
+            
+            if (!aMap || !bMap) return 0;
+            
+            // 先按地圖等級排序
+            if (aMap.level !== bMap.level) {
+                return aMap.level - bMap.level;
+            }
+            
+            // 地圖等級相同時按地圖分流排序
+            return aMapBranch - bMapBranch;
+            
+        } else if (mode === 'respawnTime') {
+            // 按重生時間排序（超時越久越上方）
+            const aTimeText = a.querySelector('.time-text');
+            const bTimeText = b.querySelector('.time-text');
+            
+            const aWeight = getRespawnTimeWeight(aTimeText);
+            const bWeight = getRespawnTimeWeight(bTimeText);
+            
+            return aWeight - bWeight;
+            
+        } else {
+            // 預設排序（按ID排序）
+            const aId = parseInt(a.getAttribute('data-id'));
+            const bId = parseInt(b.getAttribute('data-id'));
+            return aId - bId;
+        }
+    });
+    
+    // 重新排列行
+    rows.forEach(row => tableBody.appendChild(row));
+    updateRowNumbers();
+}
+
+// 獲取重生時間排序權重
+function getRespawnTimeWeight(timeText) {
+    const className = timeText.className;
+    const text = timeText.textContent;
+    
+    if (className.includes('timer-overdue')) {
+        // 超時狀態：解析超時時間，越久權重越小（越靠前）
+        const match = text.match(/超時 \+(\d+):(\d+):(\d+)/);
+        if (match) {
+            const hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const seconds = parseInt(match[3]);
+            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+            return -totalSeconds; // 負數，超時越久權重越小
+        }
+        return -999999; // 超時但無法解析時間
+    } else if (className.includes('timer-running')) {
+        // 運行中狀態：解析剩餘時間，剩餘時間越少權重越小（越靠前）
+        const match = text.match(/(\d+):(\d+):(\d+)/);
+        if (match) {
+            const hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const seconds = parseInt(match[3]);
+            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+            return totalSeconds; // 正數，剩餘時間越少權重越小
+        }
+        return 999999; // 運行中但無法解析時間
+    } else if (text === '尚未設定') {
+        // 未設定狀態：權重最大（最靠後）
+        return 9999999;
+    } else {
+        // 其他狀態：權重中等
+        return 9999998;
+    }
+}
+
+
+// 工具函數
+function updateRowNumbers() {
+    const rows = document.querySelectorAll('.data-row');
+    rows.forEach((row, index) => {
+        const rowNumberCell = row.querySelector('.row-number');
+        rowNumberCell.textContent = index + 1;
+    });
+}
+
+function playNotificationSound() {
+    // 創建音頻上下文並播放提示音
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+        console.log('無法播放音效:', error);
+    }
+}
+
+function handleKeyboardShortcuts(event) {
+    // Ctrl+N: 新增記錄
+    if (event.ctrlKey && event.key === 'n') {
+        event.preventDefault();
+        addNewRecord();
+    }
+    
+    // Ctrl+S: 匯出資料
+    if (event.ctrlKey && event.key === 's') {
+        event.preventDefault();
+        exportData();
+    }
+    
+    // Ctrl+D: 切換暗黑模式
+    if (event.ctrlKey && event.key === 'd') {
+        event.preventDefault();
+        toggleDarkMode();
+    }
+}
+
+function toggleDarkMode() {
+    isDarkMode = !isDarkMode;
+    document.body.classList.toggle('dark-mode', isDarkMode);
+    localStorage.setItem('darkMode', isDarkMode);
+}
+
+// 數據持久化
+function autoSave() {
+    const data = {
+        records: [],
+        mapInfos: mapInfos,
+        nextId: nextId,
+        nextMapId: nextMapId,
+        darkMode: isDarkMode,
+        sortMode: currentSortMode
+    };
+    
+    document.querySelectorAll('.data-row').forEach(row => {
+        const id = row.getAttribute('data-id');
+        const record = {
+            id: id,
+            mapId: row.querySelector('.map-select').value,
+            mapBranch: row.querySelector('.map-branch input').value
+        };
+        data.records.push(record);
+    });
+    
+    localStorage.setItem('timerData', JSON.stringify(data));
+}
+
+function loadData() {
+    const savedData = localStorage.getItem('timerData');
+    if (savedData) {
+        try {
+            const data = JSON.parse(savedData);
+            nextId = data.nextId || nextId;
+            nextMapId = data.nextMapId || nextMapId;
+            isDarkMode = data.darkMode || false;
+            currentSortMode = data.sortMode || 'default';
+            
+            // 載入地圖資訊
+            if (data.mapInfos) {
+                mapInfos = data.mapInfos;
+            }
+            
+            if (isDarkMode) {
+                document.body.classList.add('dark-mode');
+            }
+            
+            // 更新排序按鈕文字
+            updateSortButtonText();
+            
+            // 如果有保存的記錄，重建表格
+            if (data.records && data.records.length > 0) {
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = '';
+                
+                data.records.forEach(record => {
+                    const row = document.createElement('tr');
+                    row.className = 'data-row';
+                    row.setAttribute('data-id', record.id);
+                    
+                    
+                    // 按照地圖等級排序生成選項
+                    const sortedMaps = Object.values(mapInfos).sort((a, b) => a.level - b.level);
+                    const mapOptions = sortedMaps.map(map => 
+                        `<option value="${map.id}" ${record.mapId == map.id ? 'selected' : ''}>${map.name} (Lv.${map.level}) - ${map.boss} [${map.chapterKing}]</option>`
+                    ).join('');
+                    
+                    row.innerHTML = `
+                        <td class="row-number">${record.id}</td>
+                        <td class="map-info">
+                            <select class="map-select" onchange="updateMapInfo(${record.id}, this.value)">
+                                ${mapOptions}
+                            </select>
+                        </td>
+                        <td class="map-branch">
+                            <input type="number" value="${record.mapBranch}" class="editable-input">
+                        </td>
+                        <td class="respawn-duration">
+                            <div class="duration-controls">
+                                <div class="time-input-section">
+                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                    <span class="time-hint">時分</span>
+                                </div>
+                                <div class="timer-controls">
+                                    <button class="timer-btn start" onclick="startTimer(${record.id})">開始</button>
+                                    <button class="timer-btn reset" onclick="resetTimer(${record.id})" disabled>重設</button>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="respawn-status">
+                            <div class="status-display">
+                                <span class="time-text">尚未設定</span>
+                            </div>
+                        </td>
+                        <td class="respawn-time">
+                            <div class="time-display">
+                                <span class="respawn-time-display"></span>
+                            </div>
+                        </td>
+                        <td class="actions">
+                            <button class="action-btn delete" onclick="deleteRecord(${record.id})">刪除</button>
+                        </td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+                
+                updateRowNumbers();
+                
+                // 應用保存的排序
+                if (currentSortMode !== 'default') {
+                    sortTable(currentSortMode);
+                }
+            }
+        } catch (error) {
+            console.error('載入數據失敗:', error);
+        }
+    }
+}
+
+function exportData() {
+    const data = {
+        records: [],
+        mapInfos: mapInfos,
+        exportTime: new Date().toISOString(),
+        version: '2.0'
+    };
+    
+    document.querySelectorAll('.data-row').forEach(row => {
+        const id = row.getAttribute('data-id');
+        const record = {
+            id: id,
+            mapId: row.querySelector('.map-select').value,
+            mapBranch: row.querySelector('.map-branch input').value
+        };
+        data.records.push(record);
+    });
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `timer-data-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            
+            if (confirm('匯入資料將覆蓋現有資料，確定要繼續嗎？')) {
+                // 清空現有表格
+                const tableBody = document.getElementById('tableBody');
+                tableBody.innerHTML = '';
+                
+                // 停止所有計時器
+                Object.keys(timers).forEach(id => {
+                    clearInterval(timers[id]);
+                });
+                timers = {};
+                
+                // 載入地圖資訊
+                if (data.mapInfos) {
+                    mapInfos = data.mapInfos;
+                }
+                
+                // 重建表格
+                if (data.records && data.records.length > 0) {
+                    let maxId = 0;
+                    data.records.forEach(record => {
+                        const row = document.createElement('tr');
+                        row.className = 'data-row';
+                        row.setAttribute('data-id', record.id);
+                        
+                        
+                        // 按照地圖等級排序生成選項
+                        const sortedMaps = Object.values(mapInfos).sort((a, b) => a.level - b.level);
+                        const mapOptions = sortedMaps.map(map => 
+                            `<option value="${map.id}" ${record.mapId == map.id ? 'selected' : ''}>${map.name} (Lv.${map.level}) - ${map.boss} [${map.chapterKing}]</option>`
+                        ).join('');
+                        
+                        row.innerHTML = `
+                            <td class="row-number">${record.id}</td>
+                            <td class="map-info">
+                                <select class="map-select" onchange="updateMapInfo(${record.id}, this.value)">
+                                    ${mapOptions}
+                                </select>
+                            </td>
+                            <td class="map-branch">
+                                <input type="number" value="${record.mapBranch}" class="editable-input">
+                            </td>
+                            <td class="respawn-duration">
+                                <div class="duration-controls">
+                                    <div class="time-input-section">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                        <span class="time-hint">時分</span>
+                                    </div>
+                                    <div class="timer-controls">
+                                        <button class="timer-btn start" onclick="startTimer(${record.id})">開始</button>
+                                        <button class="timer-btn reset" onclick="resetTimer(${record.id})" disabled>重設</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="respawn-status">
+                                <div class="status-display">
+                                    <span class="time-text">尚未設定</span>
+                                </div>
+                            </td>
+                            <td class="respawn-time">
+                                <div class="time-display">
+                                    <span class="respawn-time-display"></span>
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <button class="action-btn delete" onclick="deleteRecord(${record.id})">刪除</button>
+                            </td>
+                        `;
+                        
+                        tableBody.appendChild(row);
+                        maxId = Math.max(maxId, parseInt(record.id));
+                    });
+                    
+                    nextId = maxId + 1;
+                    updateRowNumbers();
+                    updateMapSelects();
+                    
+                    // 應用當前排序
+                    if (currentSortMode !== 'default') {
+                        sortTable(currentSortMode);
+                    }
+                    
+                    autoSave();
+                    
+                    alert('資料匯入成功！');
+                }
+            }
+        } catch (error) {
+            alert('匯入資料失敗：' + error.message);
+        }
+    };
+    
+    reader.readAsText(file);
+    event.target.value = ''; // 清空文件輸入
+}

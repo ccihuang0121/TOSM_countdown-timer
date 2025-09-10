@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>遊戲地圖倒數計時器</title>
+    <link rel="stylesheet" href="table-style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 標題區域 -->
+        <header class="header">
+            <h1 class="title">遊戲地圖倒數計時器</h1>
+            <p class="description">記錄地圖重生時間，管理BOSS復活倒數計時</p>
+        </header>
+
+        <!-- 控制按鈕區域 -->
+        <div class="controls">
+            <button class="control-btn" id="addRecord">新增記錄</button>
+            <button class="control-btn" id="manageMaps">管理地圖</button>
+            <button class="control-btn" id="sortToggle">排序切換</button>
+            <button class="control-btn" id="resetAll">重置所有計時器</button>
+            <button class="control-btn" id="exportData">匯出資料</button>
+            <button class="control-btn" id="importData">匯入資料</button>
+            <input type="file" id="fileInput" accept=".json" style="display: none;">
+        </div>
+
+        <!-- 地圖管理模態框 -->
+        <div id="mapModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>地圖資訊管理</h2>
+                    <span class="close" id="closeMapModal">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="map-form">
+                        <h3>新增/編輯地圖</h3>
+                        <div class="form-row">
+                            <label>地圖名稱:</label>
+                            <input type="text" id="mapNameInput" placeholder="輸入地圖名稱">
+                        </div>
+                        <div class="form-row">
+                            <label>地圖等級:</label>
+                            <input type="number" id="mapLevelInput" placeholder="輸入地圖等級">
+                        </div>
+                        <div class="form-row">
+                            <label>BOSS名稱:</label>
+                            <input type="text" id="bossNameInput" placeholder="輸入BOSS名稱">
+                        </div>
+                        <div class="form-row">
+                            <label>章節王:</label>
+                            <select id="chapterKingInput">
+                                <option value="T">T</option>
+                                <option value="F">F</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button class="control-btn" id="saveMap">儲存地圖</button>
+                            <button class="control-btn" id="cancelMap">取消</button>
+                        </div>
+                    </div>
+                    <div class="map-list">
+                        <h3>現有地圖</h3>
+                        <div id="mapListContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要表格區域 -->
+        <main class="main-content">
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr class="header-row">
+                            <th class="row-number">#</th>
+                            <th class="map-info">地圖資訊</th>
+                            <th class="map-branch">地圖-分流</th>
+                            <th class="respawn-duration">重生耗時</th>
+                            <th class="respawn-status">重生狀態</th>
+                            <th class="respawn-time">復活時間</th>
+                            <th class="actions">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- 範例數據 -->
+                        <tr class="data-row" data-id="1">
+                            <td class="row-number">1</td>
+                            <td class="map-info">
+                                <select class="map-select" onchange="updateMapInfo(1, this.value)">
+                                    <option value="1">王陵3層 (Lv.68) - 雷克西波 [T]</option>
+                                    <option value="2">魔族收監所第5區 (Lv.74) - 哈勃克 [T]</option>
+                                </select>
+                            </td>
+                            <td class="map-branch">
+                                <input type="number" value="1" class="editable-input">
+                            </td>
+                            <td class="respawn-duration">
+                                <div class="duration-controls">
+                                    <div class="time-input-section">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                        <span class="time-hint">時分</span>
+                                    </div>
+                                    <div class="timer-controls">
+                                        <button class="timer-btn start" onclick="startTimer(1)">開始</button>
+                                        <button class="timer-btn reset" onclick="resetTimer(1)">重設</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="respawn-status">
+                                <div class="status-display">
+                                    <span class="time-text">尚未設定</span>
+                                </div>
+                            </td>
+                            <td class="respawn-time">
+                                <div class="time-display">
+                                    <span class="respawn-time-display"></span>
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <button class="action-btn delete" onclick="deleteRecord(1)">刪除</button>
+                            </td>
+                        </tr>
+                        <tr class="data-row" data-id="2">
+                            <td class="row-number">2</td>
+                            <td class="map-info">
+                                <select class="map-select" onchange="updateMapInfo(2, this.value)">
+                                    <option value="1">王陵3層 (Lv.68) - 雷克西波 [T]</option>
+                                    <option value="2">魔族收監所第5區 (Lv.74) - 哈勃克 [T]</option>
+                                </select>
+                            </td>
+                            <td class="map-branch">
+                                <input type="number" value="2" class="editable-input">
+                            </td>
+                            <td class="respawn-duration">
+                                <div class="duration-controls">
+                                    <div class="time-input-section">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                        <span class="time-hint">時分</span>
+                                    </div>
+                                    <div class="timer-controls">
+                                        <button class="timer-btn start" onclick="startTimer(2)">開始</button>
+                                        <button class="timer-btn reset" onclick="resetTimer(2)">重設</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="respawn-status">
+                                <div class="status-display">
+                                    <span class="time-text">尚未設定</span>
+                                </div>
+                            </td>
+                            <td class="respawn-time">
+                                <div class="time-display">
+                                    <span class="respawn-time-display"></span>
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <button class="action-btn delete" onclick="deleteRecord(2)">刪除</button>
+                            </td>
+                        </tr>
+                        <tr class="data-row" data-id="3">
+                            <td class="row-number">3</td>
+                            <td class="map-info">
+                                <select class="map-select" onchange="updateMapInfo(3, this.value)">
+                                    <option value="1">王陵3層 (Lv.68) - 雷克西波 [T]</option>
+                                    <option value="2">魔族收監所第5區 (Lv.74) - 哈勃克 [T]</option>
+                                </select>
+                            </td>
+                            <td class="map-branch">
+                                <input type="number" value="3" class="editable-input">
+                            </td>
+                            <td class="respawn-duration">
+                                <div class="duration-controls">
+                                    <div class="time-input-section">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                        <span class="time-hint">時分</span>
+                                    </div>
+                                    <div class="timer-controls">
+                                        <button class="timer-btn start" onclick="startTimer(3)">開始</button>
+                                        <button class="timer-btn reset" onclick="resetTimer(3)">重設</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="respawn-status">
+                                <div class="status-display">
+                                    <span class="time-text">尚未設定</span>
+                                </div>
+                            </td>
+                            <td class="respawn-time">
+                                <div class="time-display">
+                                    <span class="respawn-time-display"></span>
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <button class="action-btn delete" onclick="deleteRecord(3)">刪除</button>
+                            </td>
+                        </tr>
+                        <tr class="data-row" data-id="4">
+                            <td class="row-number">4</td>
+                            <td class="map-info">
+                                <select class="map-select" onchange="updateMapInfo(4, this.value)">
+                                    <option value="1">王陵3層 (Lv.68) - 雷克西波 [T]</option>
+                                    <option value="2" selected>魔族收監所第5區 (Lv.74) - 哈勃克 [T]</option>
+                                </select>
+                            </td>
+                            <td class="map-branch">
+                                <input type="number" value="1" class="editable-input">
+                            </td>
+                            <td class="respawn-duration">
+                                <div class="duration-controls">
+                                    <div class="time-input-section">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                        <span class="time-hint">時分</span>
+                                    </div>
+                                    <div class="timer-controls">
+                                        <button class="timer-btn start" onclick="startTimer(4)">開始</button>
+                                        <button class="timer-btn reset" onclick="resetTimer(4)">重設</button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="respawn-status">
+                                <div class="status-display">
+                                    <span class="time-text">尚未設定</span>
+                                </div>
+                            </td>
+                            <td class="respawn-time">
+                                <div class="time-display">
+                                    <span class="respawn-time-display"></span>
+                                </div>
+                            </td>
+                            <td class="actions">
+                                <button class="action-btn delete" onclick="deleteRecord(4)">刪除</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="table-script.js"></script>
+</body>
+</html>
