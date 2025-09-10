@@ -21,16 +21,65 @@ function initializeDefaultMaps() {
     mapInfos = {
         1: {
             id: 1,
-            name: '王陵3層',
+            name: '王陵 3 層',
             level: 68,
             boss: '雷克西波',
             chapterKing: 'T'
         },
         2: {
             id: 2,
-            name: '魔族收監所第5區',
+            name: '魔族收監所第 5 區',
             level: 74,
             boss: '哈勃克',
+            chapterKing: 'T'
+        },
+		3: {
+            id: 3,
+            name: '魔法師之塔 1 層',
+            level: 77,
+            boss: '火焰蜥蜴王',
+            chapterKing: 'F'
+        },
+		4: {
+            id: 4,
+            name: '魔法師之塔 2 層',
+            level: 78,
+            boss: '瑪因洛德',
+            chapterKing: 'F'
+        },
+		5: {
+            id: 5,
+            name: '魔法師之塔 3 層',
+            level: 79,
+            boss: '赫嘉塞露女妖',
+            chapterKing: 'T'
+        },
+		6: {
+            id: 6,
+            name: '大教堂懺悔路',
+            level: 80,
+            boss: '喀拉庫曼',
+            chapterKing: 'F'
+        },
+		7: {
+            id: 7,
+            name: '大教堂正殿',
+            level: 81,
+            boss: '火焰權杖',
+            chapterKing: 'F'
+        },
+		8: {
+            id: 8,
+            name: '大教堂大迴廊',
+            level: 82,
+            boss: '利泰力斯',
+            chapterKing: 'F'
+        },
+		9: {
+            id: 9,
+            name: '大教堂至聖所',
+            level: 83,
+            boss: '那柯提斯',
             chapterKing: 'T'
         }
     };
