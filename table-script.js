@@ -274,6 +274,78 @@ function resetTimer(id) {
     resetBtn.disabled = true;
 }
 
+// 恢復計時器狀態（用於匯入資料時）
+function restoreTimer(id, timerState) {
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (!row || !timerState.respawnTime) return;
+    
+    const timeText = row.querySelector('.time-text');
+    const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+    const startBtn = row.querySelector('.timer-btn.start');
+    const resetBtn = row.querySelector('.timer-btn.reset');
+    
+    // 計算復活時間
+    const respawnTime = new Date(timerState.respawnTime);
+    const now = new Date();
+    const remaining = respawnTime - now;
+    
+    // 更新按鈕狀態
+    startBtn.disabled = true;
+    resetBtn.disabled = false;
+    
+    // 如果復活時間已過，顯示超時
+    if (remaining <= 0) {
+        const overdue = Math.abs(remaining);
+        const overdueHours = Math.floor(overdue / (1000 * 60 * 60));
+        const overdueMinutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
+        const overdueSeconds = Math.floor((overdue % (1000 * 60)) / 1000);
+        
+        timeText.textContent = `超時 +${overdueHours.toString().padStart(2, '0')}:${overdueMinutes.toString().padStart(2, '0')}:${overdueSeconds.toString().padStart(2, '0')}`;
+        timeText.className = 'time-text timer-overdue';
+    } else {
+        // 開始倒數計時
+        timers[id] = setInterval(() => {
+            const now = new Date();
+            const remaining = respawnTime - now;
+            
+            if (remaining <= 0) {
+                // 計算超時時間
+                const overdue = Math.abs(remaining);
+                const overdueHours = Math.floor(overdue / (1000 * 60 * 60));
+                const overdueMinutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
+                const overdueSeconds = Math.floor((overdue % (1000 * 60)) / 1000);
+                
+                timeText.textContent = `超時 +${overdueHours.toString().padStart(2, '0')}:${overdueMinutes.toString().padStart(2, '0')}:${overdueSeconds.toString().padStart(2, '0')}`;
+                timeText.className = 'time-text timer-overdue';
+            } else {
+                // 更新顯示時間
+                const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+                const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+                const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+                
+                timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+                timeText.className = 'time-text timer-running';
+            }
+        }, 1000);
+        
+        // 立即更新一次顯示
+        const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+        const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+        
+        timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+        timeText.className = 'time-text timer-running';
+    }
+    
+    // 顯示復活時間
+    const respawnTimeStr = respawnTime.toLocaleTimeString('zh-TW', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    respawnTimeDisplay.textContent = `復活: ${respawnTimeStr}`;
+}
+
 // 地圖管理功能
 function openMapModal() {
     document.getElementById('mapModal').style.display = 'block';
@@ -736,11 +808,38 @@ function autoSave() {
     
     document.querySelectorAll('.data-row').forEach(row => {
         const id = row.getAttribute('data-id');
+        const timeText = row.querySelector('.time-text');
+        const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+        const timeInput = row.querySelector('.time-input');
+        
         const record = {
             id: id,
             mapId: row.querySelector('.map-select').value,
-            mapBranch: row.querySelector('.map-branch input').value
+            mapBranch: row.querySelector('.map-branch input').value,
+            // 新增：記錄計時器狀態和時間資訊
+            timerState: {
+                isRunning: timers[id] ? true : false,
+                timeInput: timeInput.value,
+                timeText: timeText.textContent,
+                respawnTimeDisplay: respawnTimeDisplay.textContent,
+                respawnTime: null // 將在下面計算
+            }
         };
+        
+        // 如果計時器正在運行，計算並記錄復活時間
+        if (timers[id]) {
+            const timeInputValue = timeInput.value;
+            if (timeInputValue) {
+                const { hours, minutes } = parseTimeInput(timeInputValue);
+                if (hours > 0 || minutes > 0) {
+                    // 計算復活時間（當前時間 + 重生耗時）
+                    const now = new Date();
+                    const respawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
+                    record.timerState.respawnTime = respawnTime.toISOString();
+                }
+            }
+        }
+        
         data.records.push(record);
     });
     
@@ -779,7 +878,6 @@ function loadData() {
                     row.className = 'data-row';
                     row.setAttribute('data-id', record.id);
                     
-                    
                     // 按照地圖等級排序生成選項
                     const sortedMaps = Object.values(mapInfos).sort((a, b) => a.level - b.level);
                     const mapOptions = sortedMaps.map(map => 
@@ -799,23 +897,23 @@ function loadData() {
                         <td class="respawn-duration">
                             <div class="duration-controls">
                                 <div class="time-input-section">
-                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)" value="${record.timerState ? record.timerState.timeInput || '' : ''}">
                                     <span class="time-hint">時分</span>
                                 </div>
                                 <div class="timer-controls">
-                                    <button class="timer-btn start" onclick="startTimer(${record.id})">開始</button>
-                                    <button class="timer-btn reset" onclick="resetTimer(${record.id})" disabled>重設</button>
+                                    <button class="timer-btn start" onclick="startTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? 'disabled' : ''}>開始</button>
+                                    <button class="timer-btn reset" onclick="resetTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? '' : 'disabled'}>重設</button>
                                 </div>
                             </div>
                         </td>
                         <td class="respawn-status">
                             <div class="status-display">
-                                <span class="time-text">尚未設定</span>
+                                <span class="time-text">${record.timerState ? record.timerState.timeText || '尚未設定' : '尚未設定'}</span>
                             </div>
                         </td>
                         <td class="respawn-time">
                             <div class="time-display">
-                                <span class="respawn-time-display"></span>
+                                <span class="respawn-time-display">${record.timerState ? record.timerState.respawnTimeDisplay || '' : ''}</span>
                             </div>
                         </td>
                         <td class="actions">
@@ -824,6 +922,11 @@ function loadData() {
                     `;
                     
                     tableBody.appendChild(row);
+                    
+                    // 恢復計時器狀態
+                    if (record.timerState && record.timerState.isRunning && record.timerState.respawnTime) {
+                        restoreTimer(record.id, record.timerState);
+                    }
                 });
                 
                 updateRowNumbers();
@@ -842,16 +945,43 @@ function exportData() {
         records: [],
         mapInfos: mapInfos,
         exportTime: new Date().toISOString(),
-        version: '2.0'
+        version: '3.0'
     };
     
     document.querySelectorAll('.data-row').forEach(row => {
         const id = row.getAttribute('data-id');
+        const timeText = row.querySelector('.time-text');
+        const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+        const timeInput = row.querySelector('.time-input');
+        
         const record = {
             id: id,
             mapId: row.querySelector('.map-select').value,
-            mapBranch: row.querySelector('.map-branch input').value
+            mapBranch: row.querySelector('.map-branch input').value,
+            // 新增：記錄計時器狀態和時間資訊
+            timerState: {
+                isRunning: timers[id] ? true : false,
+                timeInput: timeInput.value,
+                timeText: timeText.textContent,
+                respawnTimeDisplay: respawnTimeDisplay.textContent,
+                respawnTime: null // 將在下面計算
+            }
         };
+        
+        // 如果計時器正在運行，計算並記錄復活時間
+        if (timers[id]) {
+            const timeInputValue = timeInput.value;
+            if (timeInputValue) {
+                const { hours, minutes } = parseTimeInput(timeInputValue);
+                if (hours > 0 || minutes > 0) {
+                    // 計算復活時間（當前時間 + 重生耗時）
+                    const now = new Date();
+                    const respawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
+                    record.timerState.respawnTime = respawnTime.toISOString();
+                }
+            }
+        }
+        
         data.records.push(record);
     });
     
@@ -899,7 +1029,6 @@ function importData(event) {
                         row.className = 'data-row';
                         row.setAttribute('data-id', record.id);
                         
-                        
                         // 按照地圖等級排序生成選項
                         const sortedMaps = Object.values(mapInfos).sort((a, b) => a.level - b.level);
                         const mapOptions = sortedMaps.map(map => 
@@ -919,23 +1048,23 @@ function importData(event) {
                             <td class="respawn-duration">
                                 <div class="duration-controls">
                                     <div class="time-input-section">
-                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)" value="${record.timerState ? record.timerState.timeInput || '' : ''}">
                                         <span class="time-hint">時分</span>
                                     </div>
                                     <div class="timer-controls">
-                                        <button class="timer-btn start" onclick="startTimer(${record.id})">開始</button>
-                                        <button class="timer-btn reset" onclick="resetTimer(${record.id})" disabled>重設</button>
+                                        <button class="timer-btn start" onclick="startTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? 'disabled' : ''}>開始</button>
+                                        <button class="timer-btn reset" onclick="resetTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? '' : 'disabled'}>重設</button>
                                     </div>
                                 </div>
                             </td>
                             <td class="respawn-status">
                                 <div class="status-display">
-                                    <span class="time-text">尚未設定</span>
+                                    <span class="time-text">${record.timerState ? record.timerState.timeText || '尚未設定' : '尚未設定'}</span>
                                 </div>
                             </td>
                             <td class="respawn-time">
                                 <div class="time-display">
-                                    <span class="respawn-time-display"></span>
+                                    <span class="respawn-time-display">${record.timerState ? record.timerState.respawnTimeDisplay || '' : ''}</span>
                                 </div>
                             </td>
                             <td class="actions">
@@ -945,6 +1074,11 @@ function importData(event) {
                         
                         tableBody.appendChild(row);
                         maxId = Math.max(maxId, parseInt(record.id));
+                        
+                        // 恢復計時器狀態
+                        if (record.timerState && record.timerState.isRunning && record.timerState.respawnTime) {
+                            restoreTimer(record.id, record.timerState);
+                        }
                     });
                     
                     nextId = maxId + 1;
