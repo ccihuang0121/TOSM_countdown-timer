@@ -125,7 +125,7 @@ body {
 .respawn-duration { width: 16%; min-width: 120px; }
 .respawn-status { width: 16%; min-width: 120px; }
 .respawn-time { width: 16%; min-width: 120px; }
-.actions { width: 10%; min-width: 90px; }
+.actions { width: 12%; min-width: 120px; }
 
 /* 數據行樣式 */
 .data-row {
@@ -352,6 +352,11 @@ body {
     min-width: 40px;
 }
 
+.action-btn.copy {
+    background: linear-gradient(45deg, #3498db, #2980b9);
+    color: white;
+}
+
 .action-btn.delete {
     background: linear-gradient(45deg, #e74c3c, #c0392b);
     color: white;
@@ -526,13 +531,13 @@ body {
     }
     
     /* 小螢幕時調整欄位寬度 */
-    .row-number { width: 6%; min-width: 35px; }
-    .map-info { width: 25%; min-width: 130px; }
-    .map-branch { width: 12%; min-width: 60px; }
-    .respawn-duration { width: 18%; min-width: 100px; }
-    .respawn-status { width: 18%; min-width: 100px; }
-    .respawn-time { width: 18%; min-width: 100px; }
-    .actions { width: 6%; min-width: 70px; }
+    .row-number { width: 5%; min-width: 35px; }
+    .map-info { width: 24%; min-width: 130px; }
+    .map-branch { width: 11%; min-width: 60px; }
+    .respawn-duration { width: 17%; min-width: 100px; }
+    .respawn-status { width: 17%; min-width: 100px; }
+    .respawn-time { width: 17%; min-width: 100px; }
+    .actions { width: 9%; min-width: 100px; }
 }
 
 @media (max-width: 480px) {
@@ -588,13 +593,13 @@ body {
     }
     
     /* 超小螢幕時進一步調整欄位寬度 */
-    .row-number { width: 8%; min-width: 30px; }
-    .map-info { width: 30%; min-width: 100px; }
-    .map-branch { width: 15%; min-width: 50px; }
-    .respawn-duration { width: 20%; min-width: 80px; }
-    .respawn-status { width: 20%; min-width: 80px; }
-    .respawn-time { width: 20%; min-width: 80px; }
-    .actions { width: 7%; min-width: 60px; }
+    .row-number { width: 7%; min-width: 30px; }
+    .map-info { width: 28%; min-width: 100px; }
+    .map-branch { width: 13%; min-width: 50px; }
+    .respawn-duration { width: 18%; min-width: 80px; }
+    .respawn-status { width: 18%; min-width: 80px; }
+    .respawn-time { width: 18%; min-width: 80px; }
+    .actions { width: 8%; min-width: 90px; }
 }
 
 /* 暗黑模式 */

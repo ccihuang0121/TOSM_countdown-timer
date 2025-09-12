@@ -535,6 +535,7 @@ function addNewRecord() {
             </div>
         </td>
         <td class="actions">
+            <button class="action-btn copy" onclick="copyRecordInfo(${nextId})">複製</button>
             <button class="action-btn delete" onclick="deleteRecord(${nextId})">刪除</button>
         </td>
     `;
@@ -560,6 +561,165 @@ function deleteRecord(id) {
             autoSave();
         }
     }
+}
+
+// 格式化時間用於複製
+function formatTimeForCopy(timeText, className) {
+    if (className.includes('timer-overdue')) {
+        // 超時狀態：解析超時時間
+        const match = timeText.match(/超時 \+(\d+):(\d+):(\d+)/);
+        if (match) {
+            const hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const seconds = parseInt(match[3]);
+            
+            if (hours > 0) {
+                return `超時 ${hours} 小時 ${minutes} 分鐘`;
+            } else if (minutes > 0) {
+                return `超時 ${minutes} 分鐘`;
+            } else {
+                return `超時 ${seconds} 秒`;
+            }
+        }
+        return timeText;
+    } else if (className.includes('timer-running')) {
+        // 運行中狀態：解析剩餘時間
+        const match = timeText.match(/(\d+):(\d+):(\d+)/);
+        if (match) {
+            const hours = parseInt(match[1]);
+            const minutes = parseInt(match[2]);
+            const seconds = parseInt(match[3]);
+            
+            if (hours > 0) {
+                return `仍需 ${hours} 小時 ${minutes} 分鐘`;
+            } else if (minutes > 0) {
+                return `仍需 ${minutes} 分鐘`;
+            } else {
+                return `仍需 ${seconds} 秒`;
+            }
+        }
+        return timeText;
+    } else {
+        return timeText;
+    }
+}
+
+// 複製記錄資訊功能
+function copyRecordInfo(id) {
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (!row) return;
+    
+    // 獲取地圖資訊
+    const mapId = row.querySelector('.map-select').value;
+    const map = mapInfos[mapId];
+    
+    // 獲取分流資訊
+    const mapBranch = row.querySelector('.map-branch input').value;
+    
+    // 獲取重生狀態
+    const timeText = row.querySelector('.time-text');
+    const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+    
+    if (!map) {
+        alert('無法獲取地圖資訊');
+        return;
+    }
+    
+    // 構建複製內容（精簡版）
+    let copyText = `Lv.${map.level} - 分流${mapBranch}`;
+    
+    // 添加重生狀態資訊
+    if (timeText.textContent && timeText.textContent !== '尚未設定') {
+        const timeStatus = formatTimeForCopy(timeText.textContent, timeText.className);
+        copyText += ` - ${timeStatus}`;
+    } else {
+        copyText += ` - 尚未設定`;
+    }
+    
+    // 複製到剪貼板
+    navigator.clipboard.writeText(copyText).then(() => {
+        // 顯示複製成功提示
+        showCopyNotification();
+    }).catch(err => {
+        // 如果剪貼板API不可用，使用傳統方法
+        fallbackCopyToClipboard(copyText);
+    });
+}
+
+// 備用複製方法（當剪貼板API不可用時）
+function fallbackCopyToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            showCopyNotification();
+        } else {
+            alert('複製失敗，請手動複製：\n' + text);
+        }
+    } catch (err) {
+        alert('複製失敗，請手動複製：\n' + text);
+    }
+    
+    document.body.removeChild(textArea);
+}
+
+// 顯示複製成功通知
+function showCopyNotification() {
+    // 創建通知元素
+    const notification = document.createElement('div');
+    notification.textContent = '已複製到剪貼板！';
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(45deg, #27ae60, #2ecc71);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-weight: bold;
+        z-index: 10000;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        animation: slideInRight 0.3s ease;
+    `;
+    
+    // 添加動畫樣式
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(notification);
+    
+    // 3秒後自動移除
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.animation = 'slideInRight 0.3s ease reverse';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    document.body.removeChild(notification);
+                    document.head.removeChild(style);
+                }
+            }, 300);
+        }
+    }, 3000);
 }
 
 
@@ -917,6 +1077,7 @@ function loadData() {
                             </div>
                         </td>
                         <td class="actions">
+                            <button class="action-btn copy" onclick="copyRecordInfo(${record.id})">複製</button>
                             <button class="action-btn delete" onclick="deleteRecord(${record.id})">刪除</button>
                         </td>
                     `;
@@ -1068,6 +1229,7 @@ function importData(event) {
                                 </div>
                             </td>
                             <td class="actions">
+                                <button class="action-btn copy" onclick="copyRecordInfo(${record.id})">複製</button>
                                 <button class="action-btn delete" onclick="deleteRecord(${record.id})">刪除</button>
                             </td>
                         `;
