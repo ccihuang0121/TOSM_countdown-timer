@@ -120,9 +120,9 @@ body {
 
 /* 欄位寬度 - 使用百分比和最小寬度 */
 .row-number { width: 4%; min-width: 45px; }
-.map-info { width: 22%; min-width: 160px; }
-.map-branch { width: 10%; min-width: 70px; }
-.respawn-duration { width: 16%; min-width: 120px; }
+.map-info { width: 24%; min-width: 160px; }
+.map-branch { width: 6%; min-width: 50px; }
+.respawn-duration { width: 20%; min-width: 150px; }
 .respawn-status { width: 16%; min-width: 120px; }
 .respawn-time { width: 16%; min-width: 120px; }
 .actions { width: 12%; min-width: 120px; }
@@ -204,8 +204,8 @@ body {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 6px;
+    flex-wrap: nowrap;
 }
 
 /* 重生狀態顯示區域 */
@@ -233,6 +233,7 @@ body {
     gap: 3px;
     flex-shrink: 0;
     justify-content: center;
+    min-width: 60px;
 }
 
 .time-input {
@@ -288,22 +289,23 @@ body {
 
 .timer-controls {
     display: flex;
-    gap: 4px;
+    gap: 3px;
     flex-wrap: nowrap;
     justify-content: center;
     flex-shrink: 0;
     align-items: center;
+    min-width: 120px;
 }
 
 .timer-btn {
-    padding: 4px 8px;
+    padding: 3px 6px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: bold;
     transition: all 0.3s ease;
-    min-width: 35px;
+    min-width: 30px;
     white-space: nowrap;
 }
 
@@ -314,6 +316,11 @@ body {
 
 .timer-btn.pause {
     background: linear-gradient(45deg, #f39c12, #e67e22);
+    color: white;
+}
+
+.timer-btn.full {
+    background: linear-gradient(45deg, #9b59b6, #8e44ad);
     color: white;
 }
 
@@ -391,6 +398,12 @@ body {
     animation: pulse 0.5s infinite;
 }
 
+.timer-full {
+    background: linear-gradient(45deg, #9b59b6, #8e44ad) !important;
+    color: white !important;
+    font-weight: bold;
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.7; }
@@ -405,7 +418,7 @@ body {
     
     .data-table {
         font-size: 0.85rem;
-        min-width: 850px;
+        min-width: 900px;
     }
     
     .header-row th {
@@ -448,7 +461,7 @@ body {
     
     .data-table {
         font-size: 0.8rem;
-        min-width: 800px;
+        min-width: 850px;
     }
     
     .header-row th {
@@ -501,7 +514,7 @@ body {
     
     .data-table {
         font-size: 0.7rem;
-        min-width: 750px;
+        min-width: 800px;
     }
     
     .editable-input {
@@ -532,12 +545,12 @@ body {
     
     /* 小螢幕時調整欄位寬度 */
     .row-number { width: 5%; min-width: 35px; }
-    .map-info { width: 24%; min-width: 130px; }
-    .map-branch { width: 11%; min-width: 60px; }
-    .respawn-duration { width: 17%; min-width: 100px; }
+    .map-info { width: 26%; min-width: 130px; }
+    .map-branch { width: 8%; min-width: 50px; }
+    .respawn-duration { width: 19%; min-width: 120px; }
     .respawn-status { width: 17%; min-width: 100px; }
     .respawn-time { width: 17%; min-width: 100px; }
-    .actions { width: 9%; min-width: 100px; }
+    .actions { width: 8%; min-width: 100px; }
 }
 
 @media (max-width: 480px) {
@@ -551,7 +564,7 @@ body {
     
     .data-table {
         font-size: 0.65rem;
-        min-width: 700px;
+        min-width: 750px;
     }
     
     .header-row th {
@@ -594,12 +607,12 @@ body {
     
     /* 超小螢幕時進一步調整欄位寬度 */
     .row-number { width: 7%; min-width: 30px; }
-    .map-info { width: 28%; min-width: 100px; }
-    .map-branch { width: 13%; min-width: 50px; }
-    .respawn-duration { width: 18%; min-width: 80px; }
+    .map-info { width: 30%; min-width: 100px; }
+    .map-branch { width: 10%; min-width: 45px; }
+    .respawn-duration { width: 20%; min-width: 100px; }
     .respawn-status { width: 18%; min-width: 80px; }
     .respawn-time { width: 18%; min-width: 80px; }
-    .actions { width: 8%; min-width: 90px; }
+    .actions { width: 7%; min-width: 90px; }
 }
 
 /* 暗黑模式 */

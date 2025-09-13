@@ -3,7 +3,7 @@ let timers = {};
 let nextId = 5; // 下一個ID
 let isDarkMode = false;
 let mapInfos = {}; // 地圖資訊
-let nextMapId = 3; // 下一個地圖ID
+let nextMapId = 10; // 下一個地圖ID
 let editingMapId = null; // 正在編輯的地圖ID
 let currentSortMode = 'mapLevel'; // 當前排序模式: 'mapLevel', 'respawnTime', 'chapterKing'
 
@@ -161,6 +161,34 @@ function parseTimeInput(timeStr) {
     return { hours: 0, minutes: 0 };
 }
 
+// 解析復活時間顯示字串
+function parseRespawnTimeDisplay(respawnTimeDisplay) {
+    if (!respawnTimeDisplay || !respawnTimeDisplay.includes('復活:')) {
+        return null;
+    }
+    
+    // 提取時間部分，格式如 "復活: 14:30:25"
+    const timeMatch = respawnTimeDisplay.match(/復活:\s*(\d{2}):(\d{2}):(\d{2})/);
+    if (!timeMatch) {
+        return null;
+    }
+    
+    const hours = parseInt(timeMatch[1]);
+    const minutes = parseInt(timeMatch[2]);
+    const seconds = parseInt(timeMatch[3]);
+    
+    // 創建今天的復活時間
+    const today = new Date();
+    const respawnTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hours, minutes, seconds);
+    
+    // 如果時間已過，則設定為明天
+    if (respawnTime <= new Date()) {
+        respawnTime.setDate(respawnTime.getDate() + 1);
+    }
+    
+    return respawnTime;
+}
+
 // 計時器功能
 function startTimer(id) {
     const row = document.querySelector(`tr[data-id="${id}"]`);
@@ -247,6 +275,32 @@ function startTimer(id) {
 
 // 暫停功能已移除
 
+function setFullStatus(id) {
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    const timeText = row.querySelector('.time-text');
+    const respawnTimeDisplay = row.querySelector('.respawn-time-display');
+    const startBtn = row.querySelector('.timer-btn.start');
+    const resetBtn = row.querySelector('.timer-btn.reset');
+    
+    // 停止計時器
+    if (timers[id]) {
+        clearInterval(timers[id]);
+        delete timers[id];
+    }
+    
+    // 設定為已滿狀態
+    timeText.textContent = '已滿';
+    timeText.className = 'time-text timer-full';
+    respawnTimeDisplay.textContent = '';
+    
+    // 更新按鈕狀態
+    startBtn.disabled = false;
+    resetBtn.disabled = false;
+    
+    // 自動保存
+    autoSave();
+}
+
 function resetTimer(id) {
     const row = document.querySelector(`tr[data-id="${id}"]`);
     const timeText = row.querySelector('.time-text');
@@ -277,17 +331,38 @@ function resetTimer(id) {
 // 恢復計時器狀態（用於匯入資料時）
 function restoreTimer(id, timerState) {
     const row = document.querySelector(`tr[data-id="${id}"]`);
-    if (!row || !timerState.respawnTime) return;
+    if (!row) return;
     
     const timeText = row.querySelector('.time-text');
     const respawnTimeDisplay = row.querySelector('.respawn-time-display');
     const startBtn = row.querySelector('.timer-btn.start');
     const resetBtn = row.querySelector('.timer-btn.reset');
     
-    // 計算復活時間
-    const respawnTime = new Date(timerState.respawnTime);
+    let respawnTime = null;
+    
+    // 優先使用 respawnTime，如果沒有則嘗試解析 respawnTimeDisplay
+    if (timerState.respawnTime) {
+        respawnTime = new Date(timerState.respawnTime);
+    } else if (timerState.respawnTimeDisplay) {
+        respawnTime = parseRespawnTimeDisplay(timerState.respawnTimeDisplay);
+    }
+    
+    if (!respawnTime) return;
+    
     const now = new Date();
     const remaining = respawnTime - now;
+    
+    // 顯示復活時間（保持原本的 respawnTimeDisplay）
+    if (timerState.respawnTimeDisplay) {
+        respawnTimeDisplay.textContent = timerState.respawnTimeDisplay;
+    } else {
+        const respawnTimeStr = respawnTime.toLocaleTimeString('zh-TW', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        respawnTimeDisplay.textContent = `復活: ${respawnTimeStr}`;
+    }
     
     // 更新按鈕狀態
     startBtn.disabled = true;
@@ -336,14 +411,6 @@ function restoreTimer(id, timerState) {
         timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
         timeText.className = 'time-text timer-running';
     }
-    
-    // 顯示復活時間
-    const respawnTimeStr = respawnTime.toLocaleTimeString('zh-TW', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-    respawnTimeDisplay.textContent = `復活: ${respawnTimeStr}`;
 }
 
 // 地圖管理功能
@@ -375,6 +442,15 @@ function saveMap() {
     
     if (!name || !level || !boss) {
         alert('請填寫所有必要欄位');
+        return;
+    }
+    
+    // 檢查地圖名稱是否已存在（編輯時排除自己）
+    const existingMap = Object.values(mapInfos).find(map => 
+        map.name === name && (!editingMapId || map.id !== editingMapId)
+    );
+    if (existingMap) {
+        alert('地圖名稱已存在，請使用不同的名稱');
         return;
     }
     
@@ -518,10 +594,11 @@ function addNewRecord() {
                     <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
                     <span class="time-hint">時分</span>
                 </div>
-                <div class="timer-controls">
-                    <button class="timer-btn start" onclick="startTimer(${nextId})">開始</button>
-                    <button class="timer-btn reset" onclick="resetTimer(${nextId})" disabled>重設</button>
-                </div>
+                                <div class="timer-controls">
+                                    <button class="timer-btn start" onclick="startTimer(${nextId})">開始</button>
+                                    <button class="timer-btn full" onclick="setFullStatus(${nextId})">已滿</button>
+                                    <button class="timer-btn reset" onclick="resetTimer(${nextId})" disabled>重設</button>
+                                </div>
             </div>
         </td>
         <td class="respawn-status">
@@ -599,6 +676,9 @@ function formatTimeForCopy(timeText, className) {
             }
         }
         return timeText;
+    } else if (timeText === '已滿') {
+        // 已滿狀態：直接返回
+        return '已滿';
     } else {
         return timeText;
     }
@@ -886,6 +966,9 @@ function getRespawnTimeWeight(timeText) {
             return totalSeconds; // 正數，剩餘時間越少權重越小
         }
         return 999999; // 運行中但無法解析時間
+    } else if (text === '已滿') {
+        // 已滿狀態：權重較小（較靠前）
+        return 5000000;
     } else if (text === '尚未設定') {
         // 未設定狀態：權重最大（最靠後）
         return 9999999;
@@ -1013,12 +1096,19 @@ function loadData() {
             const data = JSON.parse(savedData);
             nextId = data.nextId || nextId;
             nextMapId = data.nextMapId || nextMapId;
+            
+            // 確保 nextMapId 不會與現有地圖衝突
+            const maxExistingId = Math.max(...Object.keys(mapInfos).map(id => parseInt(id)));
+            if (nextMapId <= maxExistingId) {
+                nextMapId = maxExistingId + 1;
+            }
             isDarkMode = data.darkMode || false;
             currentSortMode = data.sortMode || 'mapLevel';
             
-            // 載入地圖資訊
+            // 載入地圖資訊（合併預設地圖和保存的地圖）
             if (data.mapInfos) {
-                mapInfos = data.mapInfos;
+                // 合併預設地圖和保存的地圖，保存的地圖優先
+                mapInfos = { ...mapInfos, ...data.mapInfos };
             }
             
             if (isDarkMode) {
@@ -1062,6 +1152,7 @@ function loadData() {
                                 </div>
                                 <div class="timer-controls">
                                     <button class="timer-btn start" onclick="startTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? 'disabled' : ''}>開始</button>
+                                    <button class="timer-btn full" onclick="setFullStatus(${record.id})">已滿</button>
                                     <button class="timer-btn reset" onclick="resetTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? '' : 'disabled'}>重設</button>
                                 </div>
                             </div>
@@ -1085,8 +1176,11 @@ function loadData() {
                     tableBody.appendChild(row);
                     
                     // 恢復計時器狀態
-                    if (record.timerState && record.timerState.isRunning && record.timerState.respawnTime) {
-                        restoreTimer(record.id, record.timerState);
+                    if (record.timerState && record.timerState.isRunning && (record.timerState.respawnTime || record.timerState.respawnTimeDisplay)) {
+                        // 延遲執行，確保DOM元素已經渲染
+                        setTimeout(() => {
+                            restoreTimer(record.id, record.timerState);
+                        }, 100);
                     }
                 });
                 
@@ -1177,9 +1271,16 @@ function importData(event) {
                 });
                 timers = {};
                 
-                // 載入地圖資訊
+                // 載入地圖資訊（合併預設地圖和匯入的地圖）
                 if (data.mapInfos) {
-                    mapInfos = data.mapInfos;
+                    // 合併預設地圖和匯入的地圖，匯入的地圖優先
+                    mapInfos = { ...mapInfos, ...data.mapInfos };
+                }
+                
+                // 確保 nextMapId 不會與現有地圖衝突
+                const maxExistingId = Math.max(...Object.keys(mapInfos).map(id => parseInt(id)));
+                if (nextMapId <= maxExistingId) {
+                    nextMapId = maxExistingId + 1;
                 }
                 
                 // 重建表格
@@ -1214,6 +1315,7 @@ function importData(event) {
                                     </div>
                                     <div class="timer-controls">
                                         <button class="timer-btn start" onclick="startTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? 'disabled' : ''}>開始</button>
+                                        <button class="timer-btn full" onclick="setFullStatus(${record.id})">已滿</button>
                                         <button class="timer-btn reset" onclick="resetTimer(${record.id})" ${record.timerState && record.timerState.isRunning ? '' : 'disabled'}>重設</button>
                                     </div>
                                 </div>
@@ -1238,8 +1340,11 @@ function importData(event) {
                         maxId = Math.max(maxId, parseInt(record.id));
                         
                         // 恢復計時器狀態
-                        if (record.timerState && record.timerState.isRunning && record.timerState.respawnTime) {
-                            restoreTimer(record.id, record.timerState);
+                        if (record.timerState && record.timerState.isRunning && (record.timerState.respawnTime || record.timerState.respawnTimeDisplay)) {
+                            // 延遲執行，確保DOM元素已經渲染
+                            setTimeout(() => {
+                                restoreTimer(record.id, record.timerState);
+                            }, 100);
                         }
                     });
                     
