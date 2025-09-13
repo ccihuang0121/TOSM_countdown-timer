@@ -620,6 +620,12 @@ function addNewRecord() {
     tableBody.appendChild(newRow);
     nextId++;
     updateRowNumbers();
+    
+    // 如果是地圖等級排序，更新分隔線
+    if (currentSortMode === 'mapLevel') {
+        addMapSeparators();
+    }
+    
     autoSave();
 }
 
@@ -635,6 +641,12 @@ function deleteRecord(id) {
             
             row.remove();
             updateRowNumbers();
+            
+            // 如果是地圖等級排序，更新分隔線
+            if (currentSortMode === 'mapLevel') {
+                addMapSeparators();
+            }
+            
             autoSave();
         }
     }
@@ -934,9 +946,47 @@ function sortTable(mode) {
         
         // 重新排列行
         rows.forEach(row => tableBody.appendChild(row));
+        
+        // 如果是地圖等級排序，添加地圖分隔線
+        if (mode === 'mapLevel') {
+            addMapSeparators();
+        } else {
+            removeMapSeparators();
+        }
     }
     
     updateRowNumbers();
+}
+
+// 添加地圖分隔線
+function addMapSeparators() {
+    const tableBody = document.getElementById('tableBody');
+    const rows = Array.from(tableBody.querySelectorAll('.data-row'));
+    
+    // 移除現有的分隔線
+    removeMapSeparators();
+    
+    let currentMapId = null;
+    
+    rows.forEach((row, index) => {
+        const mapId = row.querySelector('.map-select').value;
+        
+        // 如果是新的地圖，在該行前添加分隔線
+        if (currentMapId !== null && currentMapId !== mapId) {
+            const separator = document.createElement('tr');
+            separator.className = 'map-separator';
+            separator.innerHTML = '<td colspan="7" class="separator-cell"></td>';
+            tableBody.insertBefore(separator, row);
+        }
+        
+        currentMapId = mapId;
+    });
+}
+
+// 移除地圖分隔線
+function removeMapSeparators() {
+    const separators = document.querySelectorAll('.map-separator');
+    separators.forEach(separator => separator.remove());
 }
 
 // 獲取重生時間排序權重

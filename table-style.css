@@ -868,6 +868,40 @@ body {
     }
 }
 
+/* 地圖分隔線 */
+.map-separator {
+    height: 6px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        #bdc3c7 20%, 
+        #7f8c8d 50%, 
+        #bdc3c7 80%, 
+        transparent 100%
+    );
+    border: none;
+    margin: 3px 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.map-separator .separator-cell {
+    padding: 0;
+    border: none;
+    background: transparent;
+    height: 6px;
+}
+
+/* 暗黑模式分隔線 */
+.dark-mode .map-separator {
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        #95a5a6 20%, 
+        #34495e 50%, 
+        #95a5a6 80%, 
+        transparent 100%
+    );
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
 /* 暗黑模式模態框 */
 .dark-mode .modal-content {
     background-color: #2c3e50;
