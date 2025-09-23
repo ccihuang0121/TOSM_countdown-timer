@@ -90,7 +90,6 @@ function initializeDefaultMaps() {
 // 事件監聽器初始化
 function initializeEventListeners() {
     // 控制按鈕事件
-    document.getElementById('addRecord').addEventListener('click', addNewRecord);
     document.getElementById('manageMaps').addEventListener('click', openMapModal);
     document.getElementById('sortToggle').addEventListener('click', toggleSort);
     document.getElementById('resetAll').addEventListener('click', resetAllTimers);
@@ -98,6 +97,12 @@ function initializeEventListeners() {
     document.getElementById('importData').addEventListener('click', () => {
         document.getElementById('fileInput').click();
     });
+    
+    // 新增記錄選擇區域事件
+    document.getElementById('addRecordWithSelection').addEventListener('click', addNewRecordWithSelection);
+    document.getElementById('clearSelection').addEventListener('click', clearSelection);
+    document.getElementById('quickMapSelect').addEventListener('change', updateSelectionInfo);
+    document.getElementById('quickBranchInput').addEventListener('input', updateSelectionInfo);
     
     // 模態框事件
     document.getElementById('closeMapModal').addEventListener('click', closeMapModal);
@@ -596,7 +601,17 @@ function updateMapSelects() {
     const selects = document.querySelectorAll('.map-select');
     selects.forEach(select => {
         const currentValue = select.value;
+        const isQuickSelect = select.id === 'quickMapSelect';
+        
         select.innerHTML = '';
+        
+        // 如果是快速選擇下拉選單，添加預設選項
+        if (isQuickSelect) {
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '請選擇地圖';
+            select.appendChild(defaultOption);
+        }
         
         // 按照地圖等級排序
         const sortedMaps = Object.values(mapInfos).sort((a, b) => {
@@ -610,8 +625,8 @@ function updateMapSelects() {
             select.appendChild(option);
         });
         
-        // 恢復之前選擇的值
-        if (currentValue && mapInfos[currentValue]) {
+        // 恢復之前選擇的值（快速選擇下拉選單除外）
+        if (!isQuickSelect && currentValue && mapInfos[currentValue]) {
             select.value = currentValue;
         }
     });
@@ -622,15 +637,108 @@ function updateMapInfo(recordId, mapId) {
     autoSave();
 }
 
-// 數據管理功能
-function addNewRecord() {
+// 獲取指定地圖的下一個可用分流
+function getNextAvailableBranch(mapId) {
+    const existingBranches = [];
+    
+    // 收集該地圖現有的所有分流
+    document.querySelectorAll('.data-row').forEach(row => {
+        const rowMapId = row.querySelector('.map-select').value;
+        if (rowMapId == mapId) {
+            const branchValue = parseInt(row.querySelector('.map-branch input').value);
+            existingBranches.push(branchValue);
+        }
+    });
+    
+    // 找到下一個可用的分流（從1開始）
+    let nextBranch = 1;
+    while (existingBranches.includes(nextBranch)) {
+        nextBranch++;
+    }
+    
+    return nextBranch;
+}
+
+// 更新選擇資訊顯示
+function updateSelectionInfo() {
+    const mapSelect = document.getElementById('quickMapSelect');
+    const branchInput = document.getElementById('quickBranchInput');
+    const infoElement = document.getElementById('selectionInfo');
+    const clearBtn = document.getElementById('clearSelection');
+    const infoText = infoElement.querySelector('.info-text');
+    
+    const selectedMapId = mapSelect.value;
+    const branchValue = branchInput.value;
+    
+    if (selectedMapId) {
+        const map = mapInfos[selectedMapId];
+        const autoBranch = getNextAvailableBranch(selectedMapId);
+        
+        let info = `地圖: ${map.name} (Lv.${map.level})`;
+        
+        if (branchValue) {
+            info += ` | 分流: ${branchValue}`;
+        } else {
+            info += ` | 分流: ${autoBranch} (自動)`;
+        }
+        
+        infoText.textContent = info;
+        infoElement.style.display = 'block';
+        clearBtn.style.display = 'inline-block';
+    } else {
+        infoElement.style.display = 'none';
+        clearBtn.style.display = 'none';
+    }
+}
+
+// 清空選擇
+function clearSelection() {
+    const mapSelect = document.getElementById('quickMapSelect');
+    const branchInput = document.getElementById('quickBranchInput');
+    const infoElement = document.getElementById('selectionInfo');
+    const clearBtn = document.getElementById('clearSelection');
+    
+    mapSelect.value = '';
+    branchInput.value = '';
+    infoElement.style.display = 'none';
+    clearBtn.style.display = 'none';
+}
+
+// 新增記錄（帶選擇）
+function addNewRecordWithSelection() {
+    const mapSelect = document.getElementById('quickMapSelect');
+    const branchInput = document.getElementById('quickBranchInput');
+    
+    const selectedMapId = mapSelect.value;
+    if (!selectedMapId) {
+        alert('請先選擇地圖');
+        return;
+    }
+    
+    // 確定分流值
+    let branchValue;
+    if (branchInput.value) {
+        branchValue = parseInt(branchInput.value);
+    } else {
+        branchValue = getNextAvailableBranch(selectedMapId);
+    }
+    
+    // 新增記錄
+    addNewRecordWithParams(selectedMapId, branchValue);
+    
+    // 保持地圖選擇，只清空分流輸入框
+    branchInput.value = '';
+    
+    // 更新選擇資訊顯示（保持地圖選擇，更新分流為自動）
+    updateSelectionInfo();
+}
+
+// 新增記錄（帶參數）
+function addNewRecordWithParams(mapId, branchValue) {
     const tableBody = document.getElementById('tableBody');
     const newRow = document.createElement('tr');
     newRow.className = 'data-row';
     newRow.setAttribute('data-id', nextId);
-    
-    // 獲取第一個可用的地圖ID
-    const firstMapId = Object.keys(mapInfos)[0] || 1;
     
     // 按照地圖等級排序生成選項
     const sortedMaps = Object.values(mapInfos).sort((a, b) => a.level - b.level);
@@ -640,24 +748,24 @@ function addNewRecord() {
         <td class="map-info">
             <select class="map-select" onchange="updateMapInfo(${nextId}, this.value)">
                 ${sortedMaps.map(map => 
-                    `<option value="${map.id}">${map.name} (Lv.${map.level}) - ${map.boss} [${map.chapterKing}]</option>`
+                    `<option value="${map.id}" ${map.id == mapId ? 'selected' : ''}>${map.name} (Lv.${map.level}) - ${map.boss} [${map.chapterKing}]</option>`
                 ).join('')}
             </select>
         </td>
         <td class="map-branch">
-            <input type="number" value="1" class="editable-input">
+            <input type="number" value="${branchValue}" class="editable-input">
         </td>
         <td class="respawn-duration">
             <div class="duration-controls">
                 <div class="time-input-section">
-                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="-?[0-9]{1,3}" oninput="formatTimeInput(this)">
+                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="-?[0-9]{1,3}" oninput="formatTimeInput(this)">
                     <span class="time-hint">時分</span>
                 </div>
-                                <div class="timer-controls">
-                                    <button class="timer-btn start" onclick="startTimer(${nextId})">開始</button>
-                                    <button class="timer-btn full" onclick="setFullStatus(${nextId})">已滿</button>
-                                    <button class="timer-btn reset" onclick="resetTimer(${nextId})" disabled>重設</button>
-                                </div>
+                <div class="timer-controls">
+                    <button class="timer-btn start" onclick="startTimer(${nextId})">開始</button>
+                    <button class="timer-btn full" onclick="setFullStatus(${nextId})">已滿</button>
+                    <button class="timer-btn reset" onclick="resetTimer(${nextId})" disabled>重設</button>
+                </div>
             </div>
         </td>
         <td class="respawn-status">
@@ -686,6 +794,18 @@ function addNewRecord() {
     }
     
     autoSave();
+}
+
+// 數據管理功能（保留原有功能作為備用）
+function addNewRecord() {
+    // 獲取第一個可用的地圖ID
+    const firstMapId = Object.keys(mapInfos)[0] || 1;
+    
+    // 獲取該地圖的下一個可用分流
+    const nextBranch = getNextAvailableBranch(firstMapId);
+    
+    // 使用新的函數新增記錄
+    addNewRecordWithParams(firstMapId, nextBranch);
 }
 
 function deleteRecord(id) {

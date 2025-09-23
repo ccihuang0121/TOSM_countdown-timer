@@ -47,6 +47,72 @@ body {
     width: 100%;
 }
 
+/* 新增記錄選擇區域 */
+.add-record-section {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.add-record-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.selection-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.selection-group label {
+    font-weight: bold;
+    color: #2c3e50;
+    min-width: 60px;
+}
+
+.branch-input {
+    width: 80px;
+    padding: 8px;
+    border: 2px solid #e0e0e0;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease;
+}
+
+.branch-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.add-record-btn {
+    background: linear-gradient(45deg, #27ae60, #2ecc71) !important;
+    min-width: 120px;
+}
+
+.clear-btn {
+    background: linear-gradient(45deg, #95a5a6, #7f8c8d) !important;
+    min-width: 100px;
+}
+
+.selection-info {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.info-text {
+    font-size: 0.9rem;
+    color: #666;
+    font-style: italic;
+}
+
 .control-btn {
     background: linear-gradient(45deg, #3498db, #2980b9);
     color: white;
@@ -518,6 +584,31 @@ body {
         max-width: 300px;
     }
     
+    .add-record-controls {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    
+    .selection-group {
+        justify-content: space-between;
+    }
+    
+    .selection-group label {
+        min-width: auto;
+    }
+    
+    .branch-input {
+        width: 100px;
+    }
+    
+    .add-record-btn,
+    .clear-btn {
+        width: 100%;
+        max-width: 300px;
+        align-self: center;
+    }
+    
     .data-table {
         font-size: 0.7rem;
         min-width: 800px;
@@ -949,5 +1040,25 @@ body {
 }
 
 .dark-mode .map-item-details {
+    color: #bdc3c7;
+}
+
+/* 暗黑模式新增記錄區域 */
+.dark-mode .add-record-section {
+    background: #2c3e50;
+    color: #ecf0f1;
+}
+
+.dark-mode .selection-group label {
+    color: #ecf0f1;
+}
+
+.dark-mode .branch-input {
+    background: #34495e;
+    color: #ecf0f1;
+    border-color: #555;
+}
+
+.dark-mode .info-text {
     color: #bdc3c7;
 }

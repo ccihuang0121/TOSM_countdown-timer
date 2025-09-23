@@ -16,13 +16,33 @@
 
         <!-- 控制按鈕區域 -->
         <div class="controls">
-            <button class="control-btn" id="addRecord">新增記錄</button>
             <button class="control-btn" id="manageMaps">管理地圖</button>
             <button class="control-btn" id="sortToggle">切換排序 (目前為地圖等級)</button>
             <button class="control-btn" id="resetAll">重置所有計時器</button>
             <button class="control-btn" id="exportData">匯出資料</button>
             <button class="control-btn" id="importData">匯入資料</button>
             <input type="file" id="fileInput" accept=".json" style="display: none;">
+        </div>
+
+        <!-- 新增記錄選擇區域 -->
+        <div class="add-record-section">
+            <div class="add-record-controls">
+                <div class="selection-group">
+                    <label for="quickMapSelect">選擇地圖:</label>
+                    <select id="quickMapSelect" class="map-select">
+                        <option value="">請選擇地圖</option>
+                    </select>
+                </div>
+                <div class="selection-group">
+                    <label for="quickBranchInput">分流:</label>
+                    <input type="number" id="quickBranchInput" class="branch-input" placeholder="自動" min="1" max="99">
+                </div>
+                <button class="control-btn add-record-btn" id="addRecordWithSelection">新增記錄</button>
+                <button class="control-btn clear-btn" id="clearSelection" style="display: none;">清空選擇</button>
+            </div>
+            <div class="selection-info" id="selectionInfo" style="display: none;">
+                <span class="info-text"></span>
+            </div>
         </div>
 
         <!-- 地圖管理模態框 -->
