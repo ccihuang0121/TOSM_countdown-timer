@@ -404,6 +404,12 @@ body {
     font-weight: bold;
 }
 
+.timer-level {
+    background: linear-gradient(45deg, #e67e22, #d35400) !important;
+    color: white !important;
+    font-weight: bold;
+}
+
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.7; }

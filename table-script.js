@@ -123,42 +123,77 @@ function initializeEventListeners() {
 
 // 時間輸入格式化
 function formatTimeInput(input) {
-    // 只允許數字輸入
-    input.value = input.value.replace(/[^0-9]/g, '');
+    // 允許數字和負號輸入，但負號只能在開頭
+    let value = input.value;
     
-    // 限制最大長度為4位
-    if (input.value.length > 4) {
-        input.value = input.value.slice(0, 4);
+    // 移除除了數字和負號以外的所有字符
+    value = value.replace(/[^0-9-]/g, '');
+    
+    // 確保負號只能在開頭，且只有一個
+    if (value.includes('-')) {
+        const minusCount = (value.match(/-/g) || []).length;
+        if (minusCount > 1 || value.indexOf('-') !== 0) {
+            value = value.replace(/-/g, '');
+        }
     }
+    
+    // 限制最大長度為4位（包括負號）
+    if (value.length > 4) {
+        value = value.slice(0, 4);
+    }
+    
+    // 如果輸入負值，限制範圍為 -1 到 -4
+    if (value.startsWith('-')) {
+        const num = parseInt(value);
+        if (num < -4) {
+            value = '-4';
+        } else if (num > -1) {
+            value = '-1';
+        }
+    }
+    
+    input.value = value;
 }
 
 // 解析時間輸入
 function parseTimeInput(timeStr) {
     if (!timeStr || timeStr.length === 0) {
-        return { hours: 0, minutes: 0 };
+        return { hours: 0, minutes: 0, isNegative: false };
     }
     
+    // 檢查是否為負值
+    const isNegative = timeStr.startsWith('-');
     const num = parseInt(timeStr);
+    
+    // 如果是負值，返回特殊標記
+    if (isNegative) {
+        return { 
+            hours: 0, 
+            minutes: Math.abs(num), 
+            isNegative: true,
+            negativeValue: num 
+        };
+    }
     
     if (timeStr.length === 1) {
         // 1位數：代表分鐘
-        return { hours: 0, minutes: num };
+        return { hours: 0, minutes: num, isNegative: false };
     } else if (timeStr.length === 2) {
         // 2位數：代表分鐘
-        return { hours: 0, minutes: num };
+        return { hours: 0, minutes: num, isNegative: false };
     } else if (timeStr.length === 3) {
         // 3位數：前1位小時，後2位分鐘
         const hours = Math.floor(num / 100);
         const minutes = num % 100;
-        return { hours, minutes };
+        return { hours, minutes, isNegative: false };
     } else if (timeStr.length === 4) {
         // 4位數：前2位小時，後2位分鐘
         const hours = Math.floor(num / 100);
         const minutes = num % 100;
-        return { hours, minutes };
+        return { hours, minutes, isNegative: false };
     }
     
-    return { hours: 0, minutes: 0 };
+    return { hours: 0, minutes: 0, isNegative: false };
 }
 
 // 解析復活時間顯示字串
@@ -199,10 +234,34 @@ function startTimer(id) {
     const resetBtn = row.querySelector('.timer-btn.reset');
     
     // 解析時間輸入
-    const { hours, minutes } = parseTimeInput(timeInput.value);
+    const timeData = parseTimeInput(timeInput.value);
+    const { hours, minutes, isNegative, negativeValue } = timeData;
+    
+    // 如果是負值，顯示為 N 階狀態
+    if (isNegative) {
+        // 停止現有計時器
+        if (timers[id]) {
+            clearInterval(timers[id]);
+            delete timers[id];
+        }
+        
+        // 顯示階級狀態
+        const level = Math.abs(negativeValue);
+        timeText.textContent = `${level} 階`;
+        timeText.className = 'time-text timer-level';
+        
+        // 清空復活時間顯示
+        respawnTimeDisplay.textContent = '';
+        
+        // 更新按鈕狀態
+        startBtn.disabled = false;
+        resetBtn.disabled = false;
+        
+        return;
+    }
     
     if (hours === 0 && minutes === 0) {
-        alert('請輸入復活時間（例如：1234 代表 12小時34分鐘）');
+        alert('請輸入復活時間（例如：1234 代表 12小時34分鐘）或負值（-1 到 -4 代表階級）');
         return;
     }
     
@@ -591,7 +650,7 @@ function addNewRecord() {
         <td class="respawn-duration">
             <div class="duration-controls">
                 <div class="time-input-section">
-                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)">
+                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="-?[0-9]{1,3}" oninput="formatTimeInput(this)">
                     <span class="time-hint">時分</span>
                 </div>
                                 <div class="timer-controls">
@@ -691,6 +750,9 @@ function formatTimeForCopy(timeText, className) {
     } else if (timeText === '已滿') {
         // 已滿狀態：直接返回
         return '已滿';
+    } else if (className.includes('timer-level')) {
+        // 階級狀態：直接返回
+        return timeText;
     } else {
         return timeText;
     }
@@ -1019,6 +1081,14 @@ function getRespawnTimeWeight(timeText) {
     } else if (text === '已滿') {
         // 已滿狀態：權重較小（較靠前）
         return 5000000;
+    } else if (className.includes('timer-level')) {
+        // 階級狀態：解析階級數字，階級越高權重越小（越靠前）
+        const match = text.match(/(\d+) 階/);
+        if (match) {
+            const level = parseInt(match[1]);
+            return 4000000 - level * 100000; // 階級越高權重越小
+        }
+        return 4000000; // 階級但無法解析
     } else if (text === '尚未設定') {
         // 未設定狀態：權重最大（最靠後）
         return 9999999;
@@ -1123,8 +1193,9 @@ function autoSave() {
         if (timers[id]) {
             const timeInputValue = timeInput.value;
             if (timeInputValue) {
-                const { hours, minutes } = parseTimeInput(timeInputValue);
-                if (hours > 0 || minutes > 0) {
+                const timeData = parseTimeInput(timeInputValue);
+                const { hours, minutes, isNegative } = timeData;
+                if (!isNegative && (hours > 0 || minutes > 0)) {
                     // 計算復活時間（當前時間 + 重生耗時）
                     const now = new Date();
                     const respawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
@@ -1197,7 +1268,7 @@ function loadData() {
                         <td class="respawn-duration">
                             <div class="duration-controls">
                                 <div class="time-input-section">
-                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)" value="${record.timerState ? record.timerState.timeInput || '' : ''}">
+                                    <input type="text" class="time-input" placeholder="" maxlength="4" pattern="-?[0-9]{1,3}" oninput="formatTimeInput(this)" value="${record.timerState ? record.timerState.timeInput || '' : ''}">
                                     <span class="time-hint">時分</span>
                                 </div>
                                 <div class="timer-controls">
@@ -1277,8 +1348,9 @@ function exportData() {
         if (timers[id]) {
             const timeInputValue = timeInput.value;
             if (timeInputValue) {
-                const { hours, minutes } = parseTimeInput(timeInputValue);
-                if (hours > 0 || minutes > 0) {
+                const timeData = parseTimeInput(timeInputValue);
+                const { hours, minutes, isNegative } = timeData;
+                if (!isNegative && (hours > 0 || minutes > 0)) {
                     // 計算復活時間（當前時間 + 重生耗時）
                     const now = new Date();
                     const respawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
@@ -1360,7 +1432,7 @@ function importData(event) {
                             <td class="respawn-duration">
                                 <div class="duration-controls">
                                     <div class="time-input-section">
-                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="[0-9]{1,4}" oninput="formatTimeInput(this)" value="${record.timerState ? record.timerState.timeInput || '' : ''}">
+                                        <input type="text" class="time-input" placeholder="" maxlength="4" pattern="-?[0-9]{1,3}" oninput="formatTimeInput(this)" value="${record.timerState ? record.timerState.timeInput || '' : ''}">
                                         <span class="time-hint">時分</span>
                                     </div>
                                     <div class="timer-controls">
