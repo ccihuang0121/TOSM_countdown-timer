@@ -834,10 +834,37 @@ function addNewRecord() {
     addNewRecordWithParams(firstMapId, nextBranch);
 }
 
+// 重新整理指定地圖的分流編號
+function reorganizeMapBranches(mapId) {
+    // 獲取該地圖的所有記錄
+    const mapRows = Array.from(document.querySelectorAll('.data-row')).filter(row => {
+        const rowMapId = row.querySelector('.map-select').value;
+        return rowMapId == mapId;
+    });
+    
+    if (mapRows.length === 0) return;
+    
+    // 按照當前分流編號排序
+    mapRows.sort((a, b) => {
+        const aBranch = parseInt(a.querySelector('.map-branch input').value);
+        const bBranch = parseInt(b.querySelector('.map-branch input').value);
+        return aBranch - bBranch;
+    });
+    
+    // 重新分配分流編號（從1開始）
+    mapRows.forEach((row, index) => {
+        const branchInput = row.querySelector('.map-branch input');
+        branchInput.value = index + 1;
+    });
+}
+
 function deleteRecord(id) {
     if (confirm('確定要刪除此記錄嗎？')) {
         const row = document.querySelector(`tr[data-id="${id}"]`);
         if (row) {
+            // 獲取要刪除記錄的地圖ID
+            const mapId = row.querySelector('.map-select').value;
+            
             // 停止計時器
             if (timers[id]) {
                 clearInterval(timers[id]);
@@ -846,6 +873,9 @@ function deleteRecord(id) {
             
             row.remove();
             updateRowNumbers();
+            
+            // 重新整理該地圖的分流編號
+            reorganizeMapBranches(mapId);
             
             // 如果是地圖等級排序，更新分隔線
             if (currentSortMode === 'mapLevel') {
