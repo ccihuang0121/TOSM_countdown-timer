@@ -201,7 +201,7 @@ function parseTimeInput(timeStr) {
     return { hours: 0, minutes: 0, isNegative: false };
 }
 
-// 解析復活時間顯示字串
+// 解析復活時間顯示字串（用於匯入資料時）
 function parseRespawnTimeDisplay(respawnTimeDisplay) {
     if (!respawnTimeDisplay || !respawnTimeDisplay.includes('復活:')) {
         return null;
@@ -404,7 +404,7 @@ function restoreTimer(id, timerState) {
     
     let respawnTime = null;
     
-    // 優先使用 respawnTime，如果沒有則嘗試解析 respawnTimeDisplay
+    // 優先使用儲存的復活時間
     if (timerState.respawnTime) {
         respawnTime = new Date(timerState.respawnTime);
     } else if (timerState.respawnTimeDisplay) {
@@ -416,10 +416,39 @@ function restoreTimer(id, timerState) {
     const now = new Date();
     const remaining = respawnTime - now;
     
-    // 顯示復活時間（保持原本的 respawnTimeDisplay）
+    // 根據剩餘時間計算新的 timeInput
+    if (remaining > 0) {
+        const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+        const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        
+        // 將剩餘時間轉換為 timeInput 格式（4位數：前2位小時，後2位分鐘）
+        const newTimeInput = String(remainingHours * 100 + remainingMinutes).padStart(4, '0');
+        
+        // 更新 timeInput 欄位
+        const timeInput = row.querySelector('.time-input');
+        timeInput.value = newTimeInput;
+    } else {
+        // 時間差為負數時，清空 timeInput 並設定為已滿狀態
+        const timeInput = row.querySelector('.time-input');
+        timeInput.value = '';
+        
+        // 設定為已滿狀態
+        timeText.textContent = '已滿';
+        timeText.className = 'time-text timer-full';
+        
+        // 更新按鈕狀態
+        startBtn.disabled = false;
+        resetBtn.disabled = false;
+        
+        return; // 直接返回，不啟動計時器
+    }
+    
+    // 顯示復活時間（保持原始復活時間不變）
     if (timerState.respawnTimeDisplay) {
+        // 如果有原始顯示時間，保持不變
         respawnTimeDisplay.textContent = timerState.respawnTimeDisplay;
     } else {
+        // 如果沒有原始顯示時間，根據復活時間生成
         const respawnTimeStr = respawnTime.toLocaleTimeString('zh-TW', {
             hour: '2-digit',
             minute: '2-digit',
@@ -432,49 +461,46 @@ function restoreTimer(id, timerState) {
     startBtn.disabled = true;
     resetBtn.disabled = false;
     
-    // 如果復活時間已過，顯示超時
-    if (remaining <= 0) {
-        const overdue = Math.abs(remaining);
-        const overdueHours = Math.floor(overdue / (1000 * 60 * 60));
-        const overdueMinutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
-        const overdueSeconds = Math.floor((overdue % (1000 * 60)) / 1000);
+    // 使用更新後的 timeInput 重新啟動計時器
+    const timeInput = row.querySelector('.time-input');
+    const timeData = parseTimeInput(timeInput.value);
+    const { hours, minutes } = timeData;
+    
+    // 計算新的復活時間（基於更新後的 timeInput）
+    const newRespawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
+    
+    // 開始倒數計時
+    timers[id] = setInterval(() => {
+        const now = new Date();
+        const remaining = newRespawnTime - now;
         
-        timeText.textContent = `超時 +${overdueHours.toString().padStart(2, '0')}:${overdueMinutes.toString().padStart(2, '0')}:${overdueSeconds.toString().padStart(2, '0')}`;
-        timeText.className = 'time-text timer-overdue';
-    } else {
-        // 開始倒數計時
-        timers[id] = setInterval(() => {
-            const now = new Date();
-            const remaining = respawnTime - now;
+        if (remaining <= 0) {
+            // 計算超時時間
+            const overdue = Math.abs(remaining);
+            const overdueHours = Math.floor(overdue / (1000 * 60 * 60));
+            const overdueMinutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
+            const overdueSeconds = Math.floor((overdue % (1000 * 60)) / 1000);
             
-            if (remaining <= 0) {
-                // 計算超時時間
-                const overdue = Math.abs(remaining);
-                const overdueHours = Math.floor(overdue / (1000 * 60 * 60));
-                const overdueMinutes = Math.floor((overdue % (1000 * 60 * 60)) / (1000 * 60));
-                const overdueSeconds = Math.floor((overdue % (1000 * 60)) / 1000);
-                
-                timeText.textContent = `超時 +${overdueHours.toString().padStart(2, '0')}:${overdueMinutes.toString().padStart(2, '0')}:${overdueSeconds.toString().padStart(2, '0')}`;
-                timeText.className = 'time-text timer-overdue';
-            } else {
-                // 更新顯示時間
-                const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
-                const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-                const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
-                
-                timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-                timeText.className = 'time-text timer-running';
-            }
-        }, 1000);
-        
-        // 立即更新一次顯示
-        const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
-        const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        
-        timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-        timeText.className = 'time-text timer-running';
-    }
+            timeText.textContent = `超時 +${overdueHours.toString().padStart(2, '0')}:${overdueMinutes.toString().padStart(2, '0')}:${overdueSeconds.toString().padStart(2, '0')}`;
+            timeText.className = 'time-text timer-overdue';
+        } else {
+            // 更新顯示時間
+            const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+            const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+            const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+            
+            timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+            timeText.className = 'time-text timer-running';
+        }
+    }, 1000);
+    
+    // 立即更新一次顯示
+    const remainingHours = Math.floor(remaining / (1000 * 60 * 60));
+    const remainingMinutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const remainingSeconds = Math.floor((remaining % (1000 * 60)) / 1000);
+    
+    timeText.textContent = `${remainingHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    timeText.className = 'time-text timer-running';
 }
 
 // 地圖管理功能
@@ -1309,8 +1335,9 @@ function autoSave() {
             }
         };
         
-        // 如果計時器正在運行，計算並記錄復活時間
+        // 計算並記錄復活時間
         if (timers[id]) {
+            // 計時器正在運行，從時間輸入計算復活時間
             const timeInputValue = timeInput.value;
             if (timeInputValue) {
                 const timeData = parseTimeInput(timeInputValue);
@@ -1321,6 +1348,12 @@ function autoSave() {
                     const respawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
                     record.timerState.respawnTime = respawnTime.toISOString();
                 }
+            }
+        } else if (respawnTimeDisplay.textContent && respawnTimeDisplay.textContent.includes('復活:')) {
+            // 計時器已停止，但仍有復活時間顯示，嘗試從顯示時間計算復活時間
+            const parsedTime = parseRespawnTimeDisplay(respawnTimeDisplay.textContent);
+            if (parsedTime) {
+                record.timerState.respawnTime = parsedTime.toISOString();
             }
         }
         
@@ -1464,8 +1497,9 @@ function exportData() {
             }
         };
         
-        // 如果計時器正在運行，計算並記錄復活時間
+        // 計算並記錄復活時間
         if (timers[id]) {
+            // 計時器正在運行，從時間輸入計算復活時間
             const timeInputValue = timeInput.value;
             if (timeInputValue) {
                 const timeData = parseTimeInput(timeInputValue);
@@ -1476,6 +1510,12 @@ function exportData() {
                     const respawnTime = new Date(now.getTime() + (hours * 60 + minutes) * 60 * 1000);
                     record.timerState.respawnTime = respawnTime.toISOString();
                 }
+            }
+        } else if (respawnTimeDisplay.textContent && respawnTimeDisplay.textContent.includes('復活:')) {
+            // 計時器已停止，但仍有復活時間顯示，嘗試從顯示時間計算復活時間
+            const parsedTime = parseRespawnTimeDisplay(respawnTimeDisplay.textContent);
+            if (parsedTime) {
+                record.timerState.respawnTime = parsedTime.toISOString();
             }
         }
         
