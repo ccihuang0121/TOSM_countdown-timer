@@ -685,6 +685,62 @@ function getNextAvailableBranch(mapId) {
     return nextBranch;
 }
 
+// 檢查是否存在相同的地圖與分流組合
+function findExistingRecord(mapId, branchValue) {
+    const existingRows = document.querySelectorAll('.data-row');
+    
+    for (let row of existingRows) {
+        const rowMapId = row.querySelector('.map-select').value;
+        const rowBranchValue = parseInt(row.querySelector('.map-branch input').value);
+        
+        if (rowMapId == mapId && rowBranchValue == branchValue) {
+            return row;
+        }
+    }
+    
+    return null;
+}
+
+// 重新整理指定地圖的分流編號（為新記錄騰出空間）
+function reorganizeMapBranchesForNewRecord(mapId, newBranchValue) {
+    // 獲取該地圖的所有記錄
+    const mapRows = Array.from(document.querySelectorAll('.data-row')).filter(row => {
+        const rowMapId = row.querySelector('.map-select').value;
+        return rowMapId == mapId;
+    });
+    
+    if (mapRows.length === 0) return;
+    
+    // 按照當前分流編號排序
+    mapRows.sort((a, b) => {
+        const aBranch = parseInt(a.querySelector('.map-branch input').value);
+        const bBranch = parseInt(b.querySelector('.map-branch input').value);
+        return aBranch - bBranch;
+    });
+    
+    // 找到新分流值應該插入的位置，並將後續的分流編號往後順延
+    let insertPosition = -1;
+    for (let i = 0; i < mapRows.length; i++) {
+        const currentBranch = parseInt(mapRows[i].querySelector('.map-branch input').value);
+        if (currentBranch >= newBranchValue) {
+            insertPosition = i;
+            break;
+        }
+    }
+    
+    // 如果沒有找到插入位置，說明新分流值比所有現有分流都大
+    if (insertPosition === -1) {
+        insertPosition = mapRows.length;
+    }
+    
+    // 將從插入位置開始的所有分流編號往後順延
+    for (let i = insertPosition; i < mapRows.length; i++) {
+        const branchInput = mapRows[i].querySelector('.map-branch input');
+        const currentBranch = parseInt(branchInput.value);
+        branchInput.value = currentBranch + 1;
+    }
+}
+
 // 更新選擇資訊顯示
 function updateSelectionInfo() {
     const mapSelect = document.getElementById('quickMapSelect');
@@ -761,6 +817,14 @@ function addNewRecordWithSelection() {
 
 // 新增記錄（帶參數）
 function addNewRecordWithParams(mapId, branchValue) {
+    // 檢查是否已存在相同的地圖與分流組合
+    const existingRecord = findExistingRecord(mapId, branchValue);
+    
+    if (existingRecord) {
+        // 如果存在重複的地圖與分流組合，重新整理該地圖的分流編號
+        reorganizeMapBranchesForNewRecord(mapId, branchValue);
+    }
+    
     const tableBody = document.getElementById('tableBody');
     const newRow = document.createElement('tr');
     newRow.className = 'data-row';
